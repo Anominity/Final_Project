@@ -1,0 +1,79 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r,echo=FALSE,message=FALSE}
+source("librarys.R")
+```
+
+Initial data read in
+
+```{r}
+gdp_data <- read_csv(here::here("raw_data/gdp_quarterly_10-17.csv")) %>% 
+  clean_names()
+
+employment_data <- read_csv(here::here("raw_data/pop_employ_10-17.csv")) %>% 
+  clean_names()
+
+employ_industry_data <- read_csv(here::here("raw_data/employment_by_industry_10-17.csv")) %>% 
+  clean_names() 
+```
+
+```{r}
+gdp_cleaned <- gdp_data %>% 
+  select(country, period, measure_2, value) %>% 
+  mutate(period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
+  rename(value_in_usd = value) %>% 
+  pivot_wider(names_from = measure_2, values_from = value_in_usd)
+
+employment_cleaned <- employment_data %>% 
+  mutate(subject = recode(subject, 
+                          "EEMNC" = "Employees", 
+                          "ESENC" = "Self Employed",
+                          "ETONC" = "Total Employment",
+                          "POPNC" = "Total Population"),
+         period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
+  rename(people_in_k = value) %>% 
+  select(country, period, subject, people_in_k) %>% 
+  pivot_wider(names_from = subject, values_from = people_in_k)
+
+
+emp_ind_cleaned <- employ_industry_data %>% 
+  filter(grepl("ETO", subject)) %>% 
+  mutate(subject = 
+           recode(subject,
+                  "ETO" = "Total Employment",
+                  "ETOVA" = "Agriculture, forestry and fishing",
+                  "ETOVB_E" = "All Industry, inc energy",
+                  "ETOVC" = "Industry Manufacturing only",
+                  "ETOVF" = "Construction",
+                  "ETOVG_I" = "Distrib trade, repairs; transp; accommod, food serv activ",
+                  "ETOVJ" = "Information and communication",
+                  "ETOVK"	=	"Financial and insurance activities",
+                  "ETOVL"	=	"Real estate activities",
+                  "ETOVM_N" = "Prof, scientif, techn activ; admin, support",
+                  "ETOVO_Q" = "Public admin; compulsory ss; education; human health",			
+                  "ETOVR_U" = "Other service activities"),
+         period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
+  rename(people_in_k = value) %>% 
+  select(country, period, subject, people_in_k) %>% 
+  pivot_wider(names_from = subject, values_from = people_in_k)
+```
+
+```{r}
+emp_ind_cleaned
+gdp_cleaned
+employment_cleaned
+```
+```{r, message=FALSE, warning=FALSE}
+
+gdp_pop_ind <- gdp_cleaned %>% 
+  left_join(employment_cleaned) %>% 
+  left_join(emp_ind_cleaned)
+
+gdp_pop_ind %>% 
+  select(-c(country, period)) %>% 
+  ggpairs()
+
+```
+

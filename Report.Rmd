@@ -23,7 +23,11 @@ output:
 
 #### Domain knowledge and the business context
 
+The aim for Deloitte is to identify key areas which affect GDP and productivity within the UK and especially those which lag behind other developed nations, with the aim being to potentially target and improve these aspects in order to "keep up" with those nations.
 
+This is important to Deloitte as a financial services company as any improvements in Productivity or GDP will have direct feedback into an improved market in Financial services.
+
+Using this analysis I aim to investigate and identify some key areas and show their correlations with GDP and Productivity
 
 ## Data
 
