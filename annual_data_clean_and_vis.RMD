@@ -1,0 +1,145 @@
+---
+title: "Annual Data Cleaning"
+output: html_notebook
+---
+
+```{r,echo=FALSE,message=FALSE}
+source("librarys.R")
+
+```
+# Data Read in
+```{r}
+
+gdp_raw <- read.csv(here::here("raw_data/Annual/GDP_three_approaches00-21.csv")) %>% 
+  clean_names()
+
+bb_phones_raw <- read_csv(here::here("raw_data/Default/broadband_and_phone09-21.csv")) %>% 
+  clean_names()
+
+education_enrol_raw <- read_csv(here::here("raw_data/Default/education_enrolment_age.csv")) %>% 
+  clean_names()
+
+```
+# Data Cleaning
+
+## GDP as "Per head, constant prices, constant PPPs, OECD base year" & Growth Rate data
+```{r}
+#Per head, constant prices, constant PPPs, OECD base year = GDP measure
+gdp_value <- gdp_raw %>% 
+  filter(measure_2 == "Per head, constant prices, constant PPPs, OECD base year") %>%
+  select(country, transaction, year, value) %>% 
+  pivot_wider(names_from = "transaction", values_from = "value", names_prefix = "usd_") %>% 
+  clean_names()
+  
+gdp_value %>% 
+  skim()
+
+# Reference period 2015
+growth_rate <- gdp_raw %>% 
+  filter(measure_2 == "Growth rate") %>% 
+  select(country, transaction, year, value) %>% 
+  pivot_wider(names_from = "transaction", values_from = "value", names_prefix = "pc") %>% 
+  clean_names()
+  
+growth_rate %>% 
+  skim()
+
+
+gdp_value_grth_rt <- gdp_value %>% 
+  left_join(growth_rate)
+
+gdp_value_grth_rt %>% 
+  skim()
+```
+
+## Broadband and phone data
+```{r}
+bb_phones_raw <- bb_phones_raw %>% 
+  select(-c(location, var, time_2, reference_period_code, flag_codes, flags))
+
+fixed_bb_data <- bb_phones_raw %>% 
+  filter(variable == "Fixed broadband - All subscriptions per 100 inhabitants",
+           !grepl("Q", time)) %>% 
+  select(country, time, value) %>% 
+  rename(fixed_bb_subs_p_100 = value)
+  
+mobile_bb_data <- bb_phones_raw %>% 
+  filter(variable == "Mobile broadband - All subscriptions",
+         !grepl("Q", time)) %>% 
+  select(country, time, value) %>% 
+  rename(mobile_bb_subs = value)
+
+mobile_data_use <- bb_phones_raw %>% 
+  filter(variable == "Mobile data usage per mobile broadband subscription, GB per month",
+         !grepl("Q", time)) %>% 
+  select(country, time, value) %>% 
+  rename(mobile_gb_per_m = value)
+
+mob_bb_data <- fixed_bb_data %>% 
+  left_join(mobile_bb_data) %>% 
+  left_join(mobile_data_use) %>% 
+  mutate(time = as.integer(time))
+```
+
+## Education data
+
+```{r}
+education_enrol_raw %>% 
+  distinct(age_2)
+
+education_data <- education_enrol_raw %>% 
+  filter(gender != "Total",
+         year >= 2010,
+         education_level != "Early childhood education",
+         age_2 == "Total") %>% 
+  select(country_2, , gender, education_level, year, value) %>% 
+  pivot_wider(names_from = c(gender, education_level), values_from = value)
+
+```
+
+## Joining datasets
+```{r}
+
+gdp_annual_data <-  gdp_value_grth_rt %>% 
+  left_join(mob_bb_data, by = c("country" = "country", "year" = "time")) %>% 
+  left_join(education_data, by = c("country" = "country_2", "year" = "year"))
+
+full_data <- gdp_annual_data %>% 
+  select(-c(pc_changes_in_inventories, pc_final_consumption_expenditure_of_non_profit_institutions_serving_households)) %>% 
+  rename_with(~ sub("_isic_rev_4", "", .x), everything()) %>% 
+  rename_with(~ sub("_isic_rev4", "", .x), everything()) %>% 
+  mutate(is_uk = if_else(country == "United Kingdom", "UK", "Other OECD"))
+```
+
+```{r}
+
+full_data %>% 
+  ggplot(aes(year, usd_gross_domestic_product_expenditure_approach)) +
+  geom_line(aes(group = country, colour = is_uk))
+
+```
+
+```{r}
+
+full_data %>% 
+  ggplot(aes(year, pc_gross_domestic_product_output_approach)) +
+  geom_line(aes(group = country, colour = is_uk))
+
+```
+
+```{r}
+
+full_data %>% 
+  ggplot(aes(year, usd_final_consumption_expenditure_of_households)) +
+  geom_line(aes(group = country, colour = is_uk))
+
+```
+
+```{r}
+
+full_data %>% 
+  ggplot(aes(year, usd_of_which_actual_individual_consumption)) +
+  geom_line(aes(group = country, colour = is_uk))
+
+```
+

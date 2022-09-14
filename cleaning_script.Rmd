@@ -4,11 +4,11 @@ output: html_notebook
 ---
 ```{r,echo=FALSE,message=FALSE}
 source("librarys.R")
+
 ```
-
-Initial data read in
-
-```{r}
+# Initial GDP information from 2010 to 2017 by quarter
+## Initial data read in
+```{r, message=FALSE}
 gdp_data <- read_csv(here::here("raw_data/gdp_quarterly_10-17.csv")) %>% 
   clean_names()
 
@@ -17,63 +17,488 @@ employment_data <- read_csv(here::here("raw_data/pop_employ_10-17.csv")) %>%
 
 employ_industry_data <- read_csv(here::here("raw_data/employment_by_industry_10-17.csv")) %>% 
   clean_names() 
+
+imp_exp_data <- read_csv(here::here("raw_data/imp_exports_value.csv")) %>% 
+  clean_names()
+
 ```
 
+## Data Cleaning
+### GDP dataset cleaning
 ```{r}
 gdp_cleaned <- gdp_data %>% 
-  select(country, period, measure_2, value) %>% 
+  filter(measure == "HVPVOBARSA") %>% 
   mutate(period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
   rename(value_in_usd = value) %>% 
-  pivot_wider(names_from = measure_2, values_from = value_in_usd)
+  pivot_wider(names_from = measure_2, 
+              values_from = value_in_usd) %>%
+  clean_names() %>% 
+  select(country,
+         period,
+         per_head_us_dollars_volume_estimates_fixed_pp_ps_oecd_reference_year_seasonally_adjusted)
+```
 
-employment_cleaned <- employment_data %>% 
-  mutate(subject = recode(subject, 
-                          "EEMNC" = "Employees", 
-                          "ESENC" = "Self Employed",
-                          "ETONC" = "Total Employment",
-                          "POPNC" = "Total Population"),
-         period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
+### population over time
+```{r}
+population_cleaned <- employment_data %>% 
+  mutate(period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
   rename(people_in_k = value) %>% 
-  select(country, period, subject, people_in_k) %>% 
-  pivot_wider(names_from = subject, values_from = people_in_k)
+  select(country, period, subject_2, people_in_k) %>% 
+  pivot_wider(names_from = subject_2, 
+              values_from = people_in_k, 
+              names_prefix = "k_") %>% 
+  clean_names() %>% 
+  mutate(k_total_population = round(k_total_population / 1000, 3)) %>% 
+  select(-c(k_total_employment, k_employees, k_self_employed))
 
+```
 
+### employment by industry cleaned
+```{r}
 emp_ind_cleaned <- employ_industry_data %>% 
   filter(grepl("ETO", subject)) %>% 
-  mutate(subject = 
-           recode(subject,
-                  "ETO" = "Total Employment",
-                  "ETOVA" = "Agriculture, forestry and fishing",
-                  "ETOVB_E" = "All Industry, inc energy",
-                  "ETOVC" = "Industry Manufacturing only",
-                  "ETOVF" = "Construction",
-                  "ETOVG_I" = "Distrib trade, repairs; transp; accommod, food serv activ",
-                  "ETOVJ" = "Information and communication",
-                  "ETOVK"	=	"Financial and insurance activities",
-                  "ETOVL"	=	"Real estate activities",
-                  "ETOVM_N" = "Prof, scientif, techn activ; admin, support",
-                  "ETOVO_Q" = "Public admin; compulsory ss; education; human health",			
-                  "ETOVR_U" = "Other service activities"),
-         period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
+  mutate(period = as.yearqtr(period, format = "Q%q-%Y")) %>% 
   rename(people_in_k = value) %>% 
-  select(country, period, subject, people_in_k) %>% 
-  pivot_wider(names_from = subject, values_from = people_in_k)
+  select(country, period, subject_2, people_in_k) %>% 
+  pivot_wider(names_from = subject_2, 
+              values_from = people_in_k, 
+              names_prefix = "k_") %>% 
+  clean_names() %>% 
+  mutate(k_employment_total = round(k_employment_total / 1000, 3)) %>% 
+  rename_with(~ sub("_isic_rev_4", "", .x), everything())
+  
 ```
 
+### Trade cleaning
 ```{r}
-emp_ind_cleaned
-gdp_cleaned
-employment_cleaned
+imp_exp_cleaned <- imp_exp_data %>% 
+  pivot_wider(names_from = flow_2, values_from = value) %>% 
+  clean_names() %>% 
+  select(reporter_country, partner_country, time, exports, imports) %>% 
+  mutate(time = as.yearqtr(time, format = "%Y-Q%q"))
+
+imp_cleaned <- imp_exp_cleaned %>% 
+  select(reporter_country, partner_country, time, imports) %>% 
+  drop_na(imports) %>% 
+  rename(imports_mill_usd = imports) %>% 
+  mutate(imports_mill_usd = round(imports_mill_usd / 1000000, 2)) %>% 
+  group_by(reporter_country, time) %>%  
+  summarise(total_imports_mill_usd = sum(imports_mill_usd), .groups = "keep")
+
+exp_cleaned <- imp_exp_cleaned %>% 
+  select(reporter_country, partner_country, time, exports) %>% 
+  drop_na(exports) %>% 
+  rename(exports_mill_usd = exports) %>% 
+  mutate(exports_mill_usd = round(exports_mill_usd / 1000000, 2)) %>% 
+  group_by(reporter_country, time) %>%  
+  summarise(total_exports_mill_usd = sum(exports_mill_usd), .groups = "keep")
+
+# trade_clean <- imp_cleaned %>% 
+#   left_join(exp_cleaned, by = c("reporter_country" = "partner_country", 
+#                                 "partner_country" = "reporter_country", 
+#                                 "time" = "time")) %>% 
+#   filter(reporter_country != partner_country) %>% 
+#   rename(reporter_partner_usd = exports,
+#          partner_reporter_usd = imports)
+# 
+
+  
 ```
-```{r, message=FALSE, warning=FALSE}
+
+## Joining datasets together, by country and period
+```{r, warning=FALSE}
 
 gdp_pop_ind <- gdp_cleaned %>% 
-  left_join(employment_cleaned) %>% 
-  left_join(emp_ind_cleaned)
+  left_join(population_cleaned) %>% 
+  left_join(emp_ind_cleaned) %>% 
+  left_join(exp_cleaned, by = c("country" = "reporter_country", 
+                                "period" = "time")) %>% 
+  left_join(imp_cleaned, by = c("country" = "reporter_country", 
+                                "period" = "time"))
 
-gdp_pop_ind %>% 
-  select(-c(country, period)) %>% 
-  ggpairs()
+gdp_pop_ind
+```
+## Data Wrangling, creating proportions
 
+```{r}
+
+prop <- function(x, y, dp=2){
+  round((x / y) * 100, dp)
+}
+
+prop_data <- gdp_pop_ind %>% 
+  mutate(
+    is_uk = if_else(country == "United Kingdom", "UK", "Other OECD"),
+    p_employed = prop(k_employment_total, k_total_population),
+    p_agr_for_fish = prop(k_agriculture_forestry_and_fishing, 
+                          k_employment_total),
+    p_ind_inc_energy = prop(k_industry_including_energy, 
+                            k_employment_total),
+    p_ind_manuf = prop(k_of_which_manufacturing, 
+                       k_employment_total),
+    p_const = prop(k_construction, k_employment_total),
+    prop_dist_trd_reprs_transp_accom_food_serv_activ = 
+      prop(k_distrib_trade_repairs_transp_accommod_food_serv_activ, 
+           k_employment_total),
+    p_inf_com = prop(k_information_and_communication, 
+                     k_employment_total),
+    p_fin_insur = prop(k_financial_and_insurance_activities, 
+                       k_employment_total),
+    p_real_estate = prop(k_real_estate_activities, 
+                         k_employment_total),
+    p_prof_sci_techn_act_adm_supp = 
+      prop(k_prof_scientif_techn_activ_admin_support_service_activ, 
+           k_employment_total),
+    p_pub_adm_compul_ss_ed_hhealth = 
+      prop(k_public_admin_compulsory_s_s_education_human_health, 
+           k_employment_total),
+    p_other = prop(k_other_service_activities, 
+                   k_employment_total)
+    ) %>%
+  rename(gdp = per_head_us_dollars_volume_estimates_fixed_pp_ps_oecd_reference_year_seasonally_adjusted,
+         total_population_in_mill = k_total_population) %>% 
+  select(-c(starts_with('k_')))
+
+prop_data
+```
+
+## Calculating gdp growth and adding it to data
+```{r}
+
+growth_pc <- function(x, y, dp = 2){
+  round(((x - y) / y) * 100, dp)
+}
+
+growth <- prop_data %>% 
+  select(country, period, gdp) %>% 
+  pivot_wider(names_from = period, values_from = gdp) %>% 
+  clean_names() %>% 
+  mutate(growth_perc_2010q1 = 0,
+         growth_perc_2010q2 = growth_pc(x2010_q2, x2010_q1),
+         growth_perc_2010q3 = growth_pc(x2010_q3, x2010_q2),
+         growth_perc_2010q4 = growth_pc(x2010_q4, x2010_q3),
+         growth_perc_2011q1 = growth_pc(x2011_q1, x2010_q4),
+         growth_perc_2011q2 = growth_pc(x2011_q2, x2011_q1),
+         growth_perc_2011q3 = growth_pc(x2011_q3, x2011_q2),
+         growth_perc_2011q4 = growth_pc(x2011_q4, x2011_q3),
+         growth_perc_2012q1 = growth_pc(x2012_q1, x2011_q4),
+         growth_perc_2012q2 = growth_pc(x2012_q2, x2012_q1),
+         growth_perc_2012q3 = growth_pc(x2012_q3, x2012_q2),
+         growth_perc_2012q4 = growth_pc(x2012_q4, x2012_q3),
+         growth_perc_2013q1 = growth_pc(x2013_q1, x2012_q4),
+         growth_perc_2013q2 = growth_pc(x2013_q2, x2013_q1),
+         growth_perc_2013q3 = growth_pc(x2013_q3, x2013_q2),
+         growth_perc_2013q4 = growth_pc(x2013_q4, x2013_q3),
+         growth_perc_2014q1 = growth_pc(x2014_q1, x2013_q4),
+         growth_perc_2014q2 = growth_pc(x2014_q2, x2014_q1),
+         growth_perc_2014q3 = growth_pc(x2014_q3, x2014_q2),
+         growth_perc_2014q4 = growth_pc(x2014_q4, x2014_q3),
+         growth_perc_2015q1 = growth_pc(x2015_q1, x2014_q4),
+         growth_perc_2015q2 = growth_pc(x2015_q2, x2015_q1),
+         growth_perc_2015q3 = growth_pc(x2015_q3, x2015_q2),
+         growth_perc_2015q4 = growth_pc(x2015_q4, x2015_q3),
+         growth_perc_2016q1 = growth_pc(x2016_q1, x2015_q4),
+         growth_perc_2016q2 = growth_pc(x2016_q2, x2016_q1),
+         growth_perc_2016q3 = growth_pc(x2016_q3, x2016_q2),
+         growth_perc_2016q4 = growth_pc(x2016_q4, x2016_q3),
+         growth_perc_2017q1 = growth_pc(x2017_q1, x2016_q4),
+         growth_perc_2017q2 = growth_pc(x2017_q2, x2017_q1),
+         growth_perc_2017q3 = growth_pc(x2017_q3, x2017_q2),
+         growth_perc_2017q4 = growth_pc(x2017_q4, x2017_q3)) %>%
+  select(country, starts_with("growth")) %>% 
+  pivot_longer(cols = starts_with("growth"), names_to = "period", values_to = "perc_growth", names_prefix = "growth_perc_") %>% 
+  mutate(period = as.yearqtr(period, format = "%Yq%q"))
+
+prop_data_growth_pc <- prop_data %>% 
+  left_join(growth) 
+```
+
+## Plots 
+### UK GDP vs other countries
+```{r}
+
+prop_data %>% 
+  ggplot(aes(x = period, y = gdp)) +
+  geom_line(aes(colour = country), show.legend = FALSE) +
+  geom_line(data = (prop_data %>% filter(country == "United Kingdom")), 
+            size = 2, colour = "red")
+
+```
+### GDP Growth Comparison
+```{r}
+
+prop_data_growth_pc %>% 
+  ggplot(aes(x = period, y = perc_growth)) +
+  geom_line(aes(group = country), colour = "grey50", show.legend = FALSE) +
+  geom_line(data = (prop_data_growth_pc %>% filter(country == "United Kingdom")), 
+            size = 2, colour = "red") +
+  ylim(NA, 7.5) +
+  xlim(2010.1, NA)
+
+
+```
+
+### working out countries with better average per quarter GDP growth than the UK
+```{r}
+
+prop_data_growth_pc %>% 
+  group_by(country) %>% 
+  summarise(average_gdp_growth = mean(perc_growth)) %>% 
+  filter(average_gdp_growth >= 0.3406250)
+
+```
+
+### Plot showing average UK GDP growth vs other countries
+```{r}
+
+prop_data_growth_pc %>% 
+  # filter(period > "2013 Q4") %>% 
+  group_by(country, is_uk) %>% 
+  summarise(average_gdp_growth = mean(perc_growth)) %>% 
+  # filter(average_gdp_growth >= 0.415625) %>% 
+  arrange(average_gdp_growth) %>% 
+  ggplot(aes(x = fct_reorder(country, average_gdp_growth), average_gdp_growth)) +
+  geom_col(aes(fill = is_uk)) +
+  coord_flip()
+
+```
+
+# Model building
+## Country Split model
+### Test train set using country
+```{r}
+set.seed(15)
+n_data1 <- prop_data_growth_pc %>% 
+  distinct(country) %>% 
+  nrow()
+
+countrys <- prop_data_growth_pc %>% 
+  distinct(country) %>% 
+  mutate(country_num = 1:n_data1)
+
+countrys_index <- tibble(sample(n_data1, size = n_data1 * 0.2)) %>% 
+  clean_names()
+
+country_name_index <- countrys_index %>%
+  left_join(countrys, 
+            by = c("sample_n_data1_size_n_data1_0_2" = "country_num")) %>% 
+  select(country) %>% 
+  pull()
+  
+
+gdp_country_test <- prop_data_growth_pc %>% 
+  filter(country %in% country_name_index)
+
+gdp_country_train <- prop_data_growth_pc %>% 
+  filter(!country %in% country_name_index)
+
+gdp_country_train_tidy <- gdp_country_train %>% 
+  select(-c(country, period, is_uk))
+
+```
+
+### Build Model
+```{r}
+glmulti_country_fit <- glmulti(
+  gdp ~ ., 
+  data = gdp_country_train_tidy,
+  level = 1, # 2 = include pairwise interactions, 1 = main effects only (main effect = no pairwise interactions)
+  minsize = 0, # no min size of model
+  maxsize = -1, # -1 = no max size of model
+#  marginality = TRUE, # marginality here means the same as 'strongly hierarchical' interactions, i.e. include pairwise interactions only if both predictors present in the model as main effects.
+  method = "g", # the problem is too large for exhaustive search, so search using a genetic algorithm
+  crit = bic, # criteria for model selection is BIC value (lower is better)
+  plotty = FALSE, # don't plot models as function runs
+  report = FALSE, # do produce reports as function runs
+  chunks = 8,
+  confsetsize = 10, # return best 100 solutions
+  fitfunction = lm  # fit using the `lm` function
+)
+
+glmulti_country_fit %>% 
+    summary()
+
+```
+
+### Check AR2 and coeffs
+```{r}
+train_country_model = lm(gdp ~ total_population_in_mill + 
+                           total_exports_mill_usd + p_employed + 
+                           p_agr_for_fish + p_ind_manuf + p_const + 
+                           p_fin_insur + p_real_estate + p_other,
+                           data = gdp_country_train_tidy)
+
+train_country_model %>% 
+  summary()
+```
+
+
+### Check on Test data
+```{r}
+
+gdp_country_test_tidy <- gdp_country_test %>% 
+  select(-c(country, period, is_uk))
+
+test_country_model = lm(gdp ~ total_population_in_mill + 
+                           total_exports_mill_usd + p_employed + 
+                           p_agr_for_fish + p_ind_manuf + p_const + 
+                           p_fin_insur + p_real_estate + p_other,
+                           data = gdp_country_test_tidy)
+
+test_country_model %>% 
+  summary()
+
+```
+
+### Plot Predictions against observations
+
+```{r}
+gdp_country_test %>% 
+  # filter(country == "Australia") %>% 
+  add_predictions(test_country_model) %>%
+  add_residuals(test_country_model) %>% 
+  select(country, period, gdp, pred, resid) %>% 
+  ggplot(aes(x = period)) +
+  geom_line(aes(y = gdp, group = country), alpha = .2) +
+  geom_line(aes(y = pred, group = country), colour = "red")
+```
+### Kfold validation on country model
+```{r}
+
+full_data_tidy <- prop_data_growth_pc %>% 
+  select(-c(country, period, is_uk)) %>% 
+  drop_na()
+
+cv_100fold <- trainControl(method = "cv", #cross validation
+                          number = 100, # 10 folds
+                          savePredictions = TRUE) # save all predictions
+
+period_model_w_kfold <- train(gdp ~ total_population_in_mill + 
+                           total_exports_mill_usd + p_employed + 
+                           p_agr_for_fish + p_ind_manuf + p_const + 
+                           p_fin_insur + p_real_estate + p_other,
+               data = full_data_tidy,
+               trControl = cv_100fold,
+               method = "lm")
+
+
+period_model_w_kfold$pred
+period_model_w_kfold$resample
+
+mean(period_model_w_kfold$resample$RMSE)
+mean(period_model_w_kfold$resample$Rsquared)
+```
+
+## Period Split model
+### Test Train set
+```{r}
+set.seed(12)
+
+n_data <- nrow(prop_data_growth_pc)
+
+# make a test index
+test_index <- sample(1:n_data, size = n_data * 0.2)
+
+# use test index to create test & training datasets
+gdp_period_test <- slice(prop_data_growth_pc, test_index)
+gdp_period_train <- slice(prop_data_growth_pc, -test_index)
+
+
+
+gdp_period_train_tidy <- gdp_period_train %>% 
+  select(-c(country, period, is_uk))
+
+```
+
+#### Build Model
+```{r}
+
+glmulti_period_fit <- glmulti(
+  gdp ~ ., 
+  data = gdp_period_train_tidy,
+  level = 1, # 2 = include pairwise interactions, 1 = main effects only (main effect = no pairwise interactions)
+  minsize = 0, # no min size of model
+  maxsize = -1, # -1 = no max size of model
+#  marginality = TRUE, # marginality here means the same as 'strongly hierarchical' interactions, i.e. include pairwise interactions only if both predictors present in the model as main effects.
+  method = "g", # the problem is too large for exhaustive search, so search using a genetic algorithm
+  crit = bic, # criteria for model selection is BIC value (lower is better)
+  plotty = FALSE, # don't plot models as function runs
+  report = FALSE, # do produce reports as function runs
+  chunks = 8,
+  confsetsize = 10, # return best 100 solutions
+  fitfunction = lm  # fit using the `lm` function
+)
+
+glmulti_period_fit %>% 
+    summary()
+```
+
+### Check AR2 and coeffs
+```{r}
+
+train_period_model = lm(gdp ~ total_population_in_mill+total_exports_mill_usd+
+                   total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
+                   p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
+                   p_pub_adm_compul_ss_ed_hhealth,
+                 data = gdp_period_train)
+
+train_period_model %>% 
+  summary()
+
+```
+### Check on Test Data
+```{r}
+gdp_period_test_tidy <- gdp_period_test %>% 
+  select(-c(country, period, is_uk))
+
+test_period_model = lm(gdp ~ total_population_in_mill+total_exports_mill_usd+
+                   total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
+                   p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
+                   p_pub_adm_compul_ss_ed_hhealth,
+                 data = gdp_period_test_tidy)
+
+test_period_model %>% 
+  summary()
+```
+
+
+### Plot Predictions against observations
+```{r}
+
+gdp_period_test %>% 
+  # filter(country == "Australia") %>% 
+  add_predictions(train_period_model) %>%
+  add_residuals(train_period_model) %>% 
+  select(country, period, gdp, pred, resid) %>% 
+  ggplot(aes(x = period)) +
+  geom_line(aes(y = gdp, group = country), alpha = .2) +
+  geom_line(aes(y = pred, group = country), colour = "red")
+
+```
+### Kfold validation on Period model
+```{r}
+
+full_data_tidy <- prop_data_growth_pc %>% 
+  select(-c(country, period, is_uk)) %>% 
+  drop_na()
+
+cv_100fold <- trainControl(method = "cv", #cross validation
+                          number = 10, # 10 folds
+                          savePredictions = TRUE) # save all predictions
+
+model_w_kfold <- train(gdp ~ total_population_in_mill+total_exports_mill_usd+
+                   total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
+                   p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
+                   p_pub_adm_compul_ss_ed_hhealth,
+               data = full_data_tidy,
+               trControl = cv_100fold,
+               method = "lm")
+
+
+model_w_kfold$pred
+model_w_kfold$resample
+
+mean(model_w_kfold$resample$RMSE)
+mean(model_w_kfold$resample$Rsquared)
 ```
 
