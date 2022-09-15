@@ -111,6 +111,9 @@ full_data <- gdp_annual_data %>%
   mutate(is_uk = if_else(country == "United Kingdom", "UK", "Other OECD"))
 ```
 
+
+# Plots
+##
 ```{r}
 
 full_data %>% 
@@ -130,6 +133,17 @@ full_data %>%
 ```{r}
 
 full_data %>% 
+  group_by(country, is_uk) %>% 
+  summarise(mean_final_consumption_expenditure_of_households = 
+              mean(usd_final_consumption_expenditure_of_households)) %>% 
+  drop_na() %>% 
+  ggplot(aes(fct_reorder(country, 
+                         mean_final_consumption_expenditure_of_households),
+             mean_final_consumption_expenditure_of_households)) +
+  geom_col(aes(fill = is_uk)) +
+  coord_flip()
+
+full_data %>% 
   ggplot(aes(year, usd_final_consumption_expenditure_of_households)) +
   geom_line(aes(group = country, colour = is_uk))
 
@@ -140,6 +154,25 @@ full_data %>%
 full_data %>% 
   ggplot(aes(year, usd_of_which_actual_individual_consumption)) +
   geom_line(aes(group = country, colour = is_uk))
+
+```
+
+```{r}
+
+full_data %>% 
+  group_by(country, is_uk) %>% 
+  summarise(mean_gdp = mean(usd_gross_domestic_product_expenditure_approach), 
+            .groups = "drop") %>% 
+  filter(mean_gdp >= 38325) %>% 
+  ggplot(aes(fct_reorder(country, mean_gdp), mean_gdp)) +
+  geom_col(aes(fill = is_uk)) + 
+  coord_flip()
+
+```
+
+```{r}
+
+
 
 ```
 

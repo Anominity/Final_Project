@@ -483,7 +483,7 @@ full_data_tidy <- prop_data_growth_pc %>%
   drop_na()
 
 cv_100fold <- trainControl(method = "cv", #cross validation
-                          number = 10, # 10 folds
+                          number = 100, # 10 folds
                           savePredictions = TRUE) # save all predictions
 
 model_w_kfold <- train(gdp ~ total_population_in_mill+total_exports_mill_usd+
