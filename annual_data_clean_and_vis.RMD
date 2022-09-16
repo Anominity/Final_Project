@@ -10,13 +10,20 @@ source("librarys.R")
 # Data Read in
 ```{r}
 
-gdp_raw <- read.csv(here::here("raw_data/Annual/GDP_three_approaches00-21.csv")) %>% 
+gdp_raw <- 
+  read.csv(here::here("raw_data/Annual/GDP_three_approaches00-21.csv")) %>% 
   clean_names()
 
-bb_phones_raw <- read_csv(here::here("raw_data/Default/broadband_and_phone09-21.csv")) %>% 
+bb_phones_raw <- 
+  read_csv(here::here("raw_data/Annual/broadband_and_phone09-21.csv")) %>% 
   clean_names()
 
-education_enrol_raw <- read_csv(here::here("raw_data/Default/education_enrolment_age.csv")) %>% 
+education_enrol_raw <- 
+  read_csv(here::here("raw_data/Annual/education_enrolment_age.csv")) %>% 
+  clean_names()
+
+population_raw <- 
+  read_csv(here::here("raw_data/Annual/population_10-19.csv")) %>% 
   clean_names()
 
 ```
@@ -26,9 +33,13 @@ education_enrol_raw <- read_csv(here::here("raw_data/Default/education_enrolment
 ```{r}
 #Per head, constant prices, constant PPPs, OECD base year = GDP measure
 gdp_value <- gdp_raw %>% 
-  filter(measure_2 == "Per head, constant prices, constant PPPs, OECD base year") %>%
+  filter(
+    measure_2 == "Per head, constant prices, constant PPPs, OECD base year"
+    ) %>%
   select(country, transaction, year, value) %>% 
-  pivot_wider(names_from = "transaction", values_from = "value", names_prefix = "usd_") %>% 
+  pivot_wider(names_from = "transaction", 
+              values_from = "value", 
+              names_prefix = "usd_") %>% 
   clean_names()
   
 gdp_value %>% 
@@ -38,7 +49,9 @@ gdp_value %>%
 growth_rate <- gdp_raw %>% 
   filter(measure_2 == "Growth rate") %>% 
   select(country, transaction, year, value) %>% 
-  pivot_wider(names_from = "transaction", values_from = "value", names_prefix = "pc") %>% 
+  pivot_wider(names_from = "transaction", 
+              values_from = "value", 
+              names_prefix = "pc") %>% 
   clean_names()
   
 growth_rate %>% 
@@ -70,7 +83,8 @@ mobile_bb_data <- bb_phones_raw %>%
   rename(mobile_bb_subs = value)
 
 mobile_data_use <- bb_phones_raw %>% 
-  filter(variable == "Mobile data usage per mobile broadband subscription, GB per month",
+  filter(
+    variable == "Mobile data usage per mobile broadband subscription, GB per month",
          !grepl("Q", time)) %>% 
   select(country, time, value) %>% 
   rename(mobile_gb_per_m = value)
@@ -88,12 +102,61 @@ education_enrol_raw %>%
   distinct(age_2)
 
 education_data <- education_enrol_raw %>% 
-  filter(gender != "Total",
-         year >= 2010,
+  filter(year >= 2010,
          education_level != "Early childhood education",
          age_2 == "Total") %>% 
-  select(country_2, , gender, education_level, year, value) %>% 
-  pivot_wider(names_from = c(gender, education_level), values_from = value)
+  select(country_2, gender, education_level, year, value) %>% 
+  pivot_wider(names_from = c(gender, education_level), values_from = value) %>% 
+  clean_names()
+
+```
+
+## Population data
+```{r}
+
+population_age_groups <- population_raw %>% 
+  select(country_2, gender, age_2, year, value) %>% 
+  filter(!age_2 %in% c("2 years", "Total")) %>% 
+  pivot_wider(names_from = age_2, values_from = value) %>%
+  clean_names() %>% 
+  mutate(
+    from_0_to_4 = from_0_to_2_years + x3_years + x4_years,
+    from_5_to_9 = x5_years + x6_years + x7_years + x8_years + x9_years,
+    from_10_to_14 = x10_years + x11_years + x12_years + x13_years + x14_years,
+    from_15_to_19 = x15_years + x16_years + x17_years + x18_years + x19_years,
+    from_20_to_24 = x20_years + x21_years + x22_years + x23_years + x24_years,
+    from_25_to_29 = x25_years + x26_years + x27_years + x28_years + x29_years,
+    from_30_to_34 = x30_years + x31_years + x32_years + x33_years + x34_years,
+    from_35_to_39 = x35_years + x36_years + x37_years + x38_years + x39_years,
+    from_40_to_44 = x40_years + x41_years + x42_years + x43_years + x44_years,
+    from_45_to_49 = x45_years + x46_years + x47_years + x48_years + x49_years
+    # ,
+    # primary_age = from_5_to_9 + x10_years + x11_years + x12_years,
+    # secondary_age = x13_years + x14_years + x15_years + x16_years +
+    #   x17_years + x18_years
+    # 
+    ) %>% 
+  rename(from_65_years = x65_years_or_over) %>% 
+  select(-c(starts_with("x"), from_0_to_2_years)) %>% 
+  relocate(4:7, .after = from_45_to_49) %>% 
+  pivot_longer(cols = starts_with("from"), # c(primary_age, secondary_age), 
+               names_to = "age_group", 
+               values_to = "value") %>% 
+  pivot_wider(names_from = c(gender, age_group), values_from = value) %>%
+  clean_names()
+
+
+population_gender <- population_raw %>% 
+  select(country_2, gender, age_2, year, value) %>% 
+  filter(age_2 == "Total") %>% 
+  select(-age_2) %>% 
+  pivot_wider(names_from = gender, values_from = value) %>% 
+  clean_names() %>% 
+  rename(population_total = total,
+         population_female = female,
+         population_male = male)
+
+
 
 ```
 
@@ -101,22 +164,51 @@ education_data <- education_enrol_raw %>%
 ```{r}
 
 gdp_annual_data <-  gdp_value_grth_rt %>% 
-  left_join(mob_bb_data, by = c("country" = "country", "year" = "time")) %>% 
-  left_join(education_data, by = c("country" = "country_2", "year" = "year"))
-
-full_data <- gdp_annual_data %>% 
-  select(-c(pc_changes_in_inventories, pc_final_consumption_expenditure_of_non_profit_institutions_serving_households)) %>% 
+  left_join(mob_bb_data, by = c("country" = "country", 
+                                "year" = "time")) %>% 
+  left_join(education_data, by = c("country" = "country_2", 
+                                   "year" = "year")) %>% 
+  left_join(population_gender, by = c("country" = "country_2", 
+                                      "year" = "year")) %>% 
+  left_join(population_age_groups, by = c("country" = "country_2", 
+                                      "year" = "year"))
+all_annu_data <- gdp_annual_data %>% 
+  select(-c(pc_changes_in_inventories, 
+            pc_final_consumption_expenditure_of_non_profit_institutions_serving_households)) %>% 
   rename_with(~ sub("_isic_rev_4", "", .x), everything()) %>% 
   rename_with(~ sub("_isic_rev4", "", .x), everything()) %>% 
-  mutate(is_uk = if_else(country == "United Kingdom", "UK", "Other OECD"))
+  rename_with(~ sub("_sna08", "", .x), everything()) %>% 
+  mutate(is_uk = if_else(country == "United Kingdom", "UK", "Other OECD")) %>% 
+  clean_names()
 ```
 
+# Data Wrangling
+### proportion function
+```{r}
+prop <- function(x, y, dp=2){
+  round((x / y) * 100, dp)
+}
+```
+## proportion education
+```{r}
+all_annu_data_w_props <- all_annu_data %>% 
+  select(-c(starts_with("usd"), starts_with("pc"), starts_with("mobile"),
+            starts_with("female_from"), starts_with("male_from"), 
+            starts_with("total_from"), fixed_bb_subs_p_100)) %>% 
+  drop_na() %>% 
+  mutate(prop_f_at_ps = prop(female_primary_education, population_total),
+         prop_m_at_ps = prop(male_primary_education, population_total),
+         prop_f_at_ss = prop(female_secondary_education, population_total),
+         prop_m_at_ss = prop(male_secondary_education, population_total),
+         prop_f_ter_edu = prop(female_tertiary_education, population_total),
+         prop_m_ter_edu = prop(male_tertiary_education, population_total))
+```
 
 # Plots
 ##
 ```{r}
 
-full_data %>% 
+all_annu_data %>% 
   ggplot(aes(year, usd_gross_domestic_product_expenditure_approach)) +
   geom_line(aes(group = country, colour = is_uk))
 
@@ -124,7 +216,7 @@ full_data %>%
 
 ```{r}
 
-full_data %>% 
+all_annu_data %>% 
   ggplot(aes(year, pc_gross_domestic_product_output_approach)) +
   geom_line(aes(group = country, colour = is_uk))
 
@@ -152,6 +244,17 @@ full_data %>%
 ```{r}
 
 full_data %>% 
+  group_by(country, is_uk) %>% 
+  summarise(mean_usd_of_which_actual_individual_consumption = 
+              mean(usd_of_which_actual_individual_consumption)) %>% 
+  drop_na() %>% 
+  ggplot(aes(fct_reorder(country, 
+                         mean_usd_of_which_actual_individual_consumption),
+             mean_usd_of_which_actual_individual_consumption)) +
+  geom_col(aes(fill = is_uk)) +
+  coord_flip()
+
+full_data %>% 
   ggplot(aes(year, usd_of_which_actual_individual_consumption)) +
   geom_line(aes(group = country, colour = is_uk))
 
@@ -168,11 +271,18 @@ full_data %>%
   geom_col(aes(fill = is_uk)) + 
   coord_flip()
 
+full_data %>% 
+  filter(country %in% ctry_higher_mean_gdp)
 ```
 
 ```{r}
 
-
+full_data %>% 
+  filter(!is.na(female_primary_education)) %>%
+  select(-c(starts_with("usd"), starts_with("pc"), starts_with("mobile"))) %>%
+  ggplot(aes(year, population_total)) + 
+  geom_line(aes(group = country, colour = is_uk))
+ 
 
 ```
 

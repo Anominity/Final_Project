@@ -48,7 +48,6 @@ population_cleaned <- employment_data %>%
               values_from = people_in_k, 
               names_prefix = "k_") %>% 
   clean_names() %>% 
-  mutate(k_total_population = round(k_total_population / 1000, 3)) %>% 
   select(-c(k_total_employment, k_employees, k_self_employed))
 
 ```
@@ -64,7 +63,6 @@ emp_ind_cleaned <- employ_industry_data %>%
               values_from = people_in_k, 
               names_prefix = "k_") %>% 
   clean_names() %>% 
-  mutate(k_employment_total = round(k_employment_total / 1000, 3)) %>% 
   rename_with(~ sub("_isic_rev_4", "", .x), everything())
   
 ```
@@ -156,7 +154,7 @@ prop_data <- gdp_pop_ind %>%
                    k_employment_total)
     ) %>%
   rename(gdp = per_head_us_dollars_volume_estimates_fixed_pp_ps_oecd_reference_year_seasonally_adjusted,
-         total_population_in_mill = k_total_population) %>% 
+         total_population_in_thous = k_total_population) %>% 
   select(-c(starts_with('k_')))
 
 prop_data
@@ -206,17 +204,16 @@ growth <- prop_data %>%
          growth_perc_2017q3 = growth_pc(x2017_q3, x2017_q2),
          growth_perc_2017q4 = growth_pc(x2017_q4, x2017_q3)) %>%
   select(country, starts_with("growth")) %>% 
-  pivot_longer(cols = starts_with("growth"), names_to = "period", values_to = "perc_growth", names_prefix = "growth_perc_") %>% 
+  pivot_longer(cols = starts_with("growth"), names_to = "period", values_to = "gdp_perc_growth", names_prefix = "growth_perc_") %>% 
   mutate(period = as.yearqtr(period, format = "%Yq%q"))
 
 prop_data_growth_pc <- prop_data %>% 
-  left_join(growth) 
+  left_join(growth)
 ```
 
 ## Plots 
 ### UK GDP vs other countries
 ```{r}
-
 prop_data %>% 
   ggplot(aes(x = period, y = gdp)) +
   geom_line(aes(colour = country), show.legend = FALSE) +
@@ -228,7 +225,7 @@ prop_data %>%
 ```{r}
 
 prop_data_growth_pc %>% 
-  ggplot(aes(x = period, y = perc_growth)) +
+  ggplot(aes(x = period, y = gdp_perc_growth)) +
   geom_line(aes(group = country), colour = "grey50", show.legend = FALSE) +
   geom_line(data = (prop_data_growth_pc %>% filter(country == "United Kingdom")), 
             size = 2, colour = "red") +
@@ -241,10 +238,13 @@ prop_data_growth_pc %>%
 ### working out countries with better average per quarter GDP growth than the UK
 ```{r}
 
-prop_data_growth_pc %>% 
+ctry_higher_mean_growth <- prop_data_growth_pc %>% 
   group_by(country) %>% 
-  summarise(average_gdp_growth = mean(perc_growth)) %>% 
-  filter(average_gdp_growth >= 0.3406250)
+  summarise(average_gdp_growth = mean(gdp_perc_growth)) %>% 
+  filter(average_gdp_growth >= 0.3406250) %>% 
+  select(country) %>% 
+  pull() %>% 
+  as.list()
 
 ```
 
@@ -254,9 +254,8 @@ prop_data_growth_pc %>%
 prop_data_growth_pc %>% 
   # filter(period > "2013 Q4") %>% 
   group_by(country, is_uk) %>% 
-  summarise(average_gdp_growth = mean(perc_growth)) %>% 
+  summarise(average_gdp_growth = mean(gdp_perc_growth)) %>% 
   # filter(average_gdp_growth >= 0.415625) %>% 
-  arrange(average_gdp_growth) %>% 
   ggplot(aes(x = fct_reorder(country, average_gdp_growth), average_gdp_growth)) +
   geom_col(aes(fill = is_uk)) +
   coord_flip()
@@ -267,7 +266,7 @@ prop_data_growth_pc %>%
 ## Country Split model
 ### Test train set using country
 ```{r}
-set.seed(15)
+set.seed(523)
 n_data1 <- prop_data_growth_pc %>% 
   distinct(country) %>% 
   nrow()
@@ -276,12 +275,12 @@ countrys <- prop_data_growth_pc %>%
   distinct(country) %>% 
   mutate(country_num = 1:n_data1)
 
-countrys_index <- tibble(sample(n_data1, size = n_data1 * 0.2)) %>% 
+countrys_index <- tibble(sample(n_data1, size = n_data1 * 0.3)) %>% 
   clean_names()
 
 country_name_index <- countrys_index %>%
   left_join(countrys, 
-            by = c("sample_n_data1_size_n_data1_0_2" = "country_num")) %>% 
+            by = c("sample_n_data1_size_n_data1_0_3" = "country_num")) %>% 
   select(country) %>% 
   pull()
   
@@ -293,7 +292,8 @@ gdp_country_train <- prop_data_growth_pc %>%
   filter(!country %in% country_name_index)
 
 gdp_country_train_tidy <- gdp_country_train %>% 
-  select(-c(country, period, is_uk))
+  select(-c(country, period, is_uk, gdp_perc_growth, total_exports_mill_usd, 
+            total_imports_mill_usd))
 
 ```
 
@@ -302,10 +302,10 @@ gdp_country_train_tidy <- gdp_country_train %>%
 glmulti_country_fit <- glmulti(
   gdp ~ ., 
   data = gdp_country_train_tidy,
-  level = 1, # 2 = include pairwise interactions, 1 = main effects only (main effect = no pairwise interactions)
+  level = 2, # 2 = include pairwise interactions, 1 = main effects only (main effect = no pairwise interactions)
   minsize = 0, # no min size of model
   maxsize = -1, # -1 = no max size of model
-#  marginality = TRUE, # marginality here means the same as 'strongly hierarchical' interactions, i.e. include pairwise interactions only if both predictors present in the model as main effects.
+  marginality = TRUE, # marginality here means the same as 'strongly hierarchical' interactions, i.e. include pairwise interactions only if both predictors present in the model as main effects.
   method = "g", # the problem is too large for exhaustive search, so search using a genetic algorithm
   crit = bic, # criteria for model selection is BIC value (lower is better)
   plotty = FALSE, # don't plot models as function runs
@@ -315,21 +315,63 @@ glmulti_country_fit <- glmulti(
   fitfunction = lm  # fit using the `lm` function
 )
 
-glmulti_country_fit %>% 
-    summary()
+print(glmulti_country_fit)
+ 
 
 ```
 
 ### Check AR2 and coeffs
 ```{r}
-train_country_model = lm(gdp ~ total_population_in_mill + 
-                           total_exports_mill_usd + p_employed + 
-                           p_agr_for_fish + p_ind_manuf + p_const + 
-                           p_fin_insur + p_real_estate + p_other,
-                           data = gdp_country_train_tidy)
+train_country_model = lm(
+  gdp ~ 1 + total_population_in_thous + p_employed + p_agr_for_fish +                                                                 
+    p_ind_inc_energy + p_ind_manuf + p_const + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ + p_inf_com + 
+    p_fin_insur + p_real_estate + p_prof_sci_techn_act_adm_supp + 
+    p_pub_adm_compul_ss_ed_hhealth + p_other + 
+    p_employed:total_population_in_thous + 
+    p_ind_inc_energy:total_population_in_thous + 
+    p_ind_manuf:total_population_in_thous + p_ind_manuf:p_employed + 
+    p_const:p_agr_for_fish + p_const:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:total_population_in_thous +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_agr_for_fish +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_const + 
+    p_inf_com:p_employed + p_inf_com:p_ind_manuf + p_inf_com:p_const + 
+    p_inf_com:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_fin_insur:total_population_in_thous + p_fin_insur:p_agr_for_fish +     
+    p_fin_insur:p_const + p_fin_insur:p_inf_com + p_real_estate:p_employed + 
+    p_real_estate:p_agr_for_fish + p_real_estate:p_ind_manuf + 
+    p_real_estate:p_const + 
+    p_real_estate:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_real_estate:p_inf_com + p_real_estate:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:total_population_in_thous + 
+    p_prof_sci_techn_act_adm_supp:p_employed + 
+    p_prof_sci_techn_act_adm_supp:p_ind_inc_energy + 
+    p_prof_sci_techn_act_adm_supp:p_const + 
+    p_prof_sci_techn_act_adm_supp:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_prof_sci_techn_act_adm_supp:p_inf_com + 
+    p_prof_sci_techn_act_adm_supp:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:p_real_estate + 
+    p_pub_adm_compul_ss_ed_hhealth:total_population_in_thous + 
+    p_pub_adm_compul_ss_ed_hhealth:p_employed + 
+    p_pub_adm_compul_ss_ed_hhealth:p_agr_for_fish +
+    p_pub_adm_compul_ss_ed_hhealth:p_ind_inc_energy + 
+    p_pub_adm_compul_ss_ed_hhealth:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_pub_adm_compul_ss_ed_hhealth:p_inf_com + 
+    p_pub_adm_compul_ss_ed_hhealth:p_fin_insur +
+    p_pub_adm_compul_ss_ed_hhealth:p_real_estate + 
+    p_other:total_population_in_thous +
+    p_other:p_agr_for_fish + p_other:p_ind_inc_energy + p_other:p_ind_manuf + 
+    p_other:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_other:p_inf_com + p_other:p_fin_insur + p_other:p_real_estate +
+    p_other:p_prof_sci_techn_act_adm_supp,                 
+  data = gdp_country_train_tidy)
 
 train_country_model %>% 
   summary()
+
+train_country_model %>% 
+  autoplot()
 ```
 
 
@@ -337,16 +379,59 @@ train_country_model %>%
 ```{r}
 
 gdp_country_test_tidy <- gdp_country_test %>% 
-  select(-c(country, period, is_uk))
+  select(-c(country, period, is_uk, gdp_perc_growth, total_exports_mill_usd, 
+            total_imports_mill_usd))
 
-test_country_model = lm(gdp ~ total_population_in_mill + 
-                           total_exports_mill_usd + p_employed + 
-                           p_agr_for_fish + p_ind_manuf + p_const + 
-                           p_fin_insur + p_real_estate + p_other,
-                           data = gdp_country_test_tidy)
+test_country_model = lm(
+  gdp ~ 1 + total_population_in_thous + p_employed + p_agr_for_fish +                                                                 
+    p_ind_inc_energy + p_ind_manuf + p_const + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ + p_inf_com + 
+    p_fin_insur + p_real_estate + p_prof_sci_techn_act_adm_supp + 
+    p_pub_adm_compul_ss_ed_hhealth + p_other + 
+    p_employed:total_population_in_thous + 
+    p_ind_inc_energy:total_population_in_thous + 
+    p_ind_manuf:total_population_in_thous + p_ind_manuf:p_employed + 
+    p_const:p_agr_for_fish + p_const:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:total_population_in_thous +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_agr_for_fish +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_const + 
+    p_inf_com:p_employed + p_inf_com:p_ind_manuf + p_inf_com:p_const + 
+    p_inf_com:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_fin_insur:total_population_in_thous + p_fin_insur:p_agr_for_fish +     
+    p_fin_insur:p_const + p_fin_insur:p_inf_com + p_real_estate:p_employed + 
+    p_real_estate:p_agr_for_fish + p_real_estate:p_ind_manuf + 
+    p_real_estate:p_const + 
+    p_real_estate:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_real_estate:p_inf_com + p_real_estate:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:total_population_in_thous + 
+    p_prof_sci_techn_act_adm_supp:p_employed + 
+    p_prof_sci_techn_act_adm_supp:p_ind_inc_energy + 
+    p_prof_sci_techn_act_adm_supp:p_const + 
+    p_prof_sci_techn_act_adm_supp:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_prof_sci_techn_act_adm_supp:p_inf_com + 
+    p_prof_sci_techn_act_adm_supp:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:p_real_estate + 
+    p_pub_adm_compul_ss_ed_hhealth:total_population_in_thous + 
+    p_pub_adm_compul_ss_ed_hhealth:p_employed + 
+    p_pub_adm_compul_ss_ed_hhealth:p_agr_for_fish +
+    p_pub_adm_compul_ss_ed_hhealth:p_ind_inc_energy + 
+    p_pub_adm_compul_ss_ed_hhealth:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_pub_adm_compul_ss_ed_hhealth:p_inf_com + 
+    p_pub_adm_compul_ss_ed_hhealth:p_fin_insur +
+    p_pub_adm_compul_ss_ed_hhealth:p_real_estate + 
+    p_other:total_population_in_thous +
+    p_other:p_agr_for_fish + p_other:p_ind_inc_energy + p_other:p_ind_manuf + 
+    p_other:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_other:p_inf_com + p_other:p_fin_insur + p_other:p_real_estate +
+    p_other:p_prof_sci_techn_act_adm_supp,                 
+  data = gdp_country_test_tidy)
 
 test_country_model %>% 
   summary()
+
+test_country_model %>% 
+  autoplot()
 
 ```
 
@@ -360,7 +445,8 @@ gdp_country_test %>%
   select(country, period, gdp, pred, resid) %>% 
   ggplot(aes(x = period)) +
   geom_line(aes(y = gdp, group = country), alpha = .2) +
-  geom_line(aes(y = pred, group = country), colour = "red")
+  geom_line(aes(y = pred, group = country), colour = "red") +
+  geom_smooth(method = "lm", aes(y = pred, group = country))
 ```
 ### Kfold validation on country model
 ```{r}
@@ -373,10 +459,47 @@ cv_100fold <- trainControl(method = "cv", #cross validation
                           number = 100, # 10 folds
                           savePredictions = TRUE) # save all predictions
 
-period_model_w_kfold <- train(gdp ~ total_population_in_mill + 
-                           total_exports_mill_usd + p_employed + 
-                           p_agr_for_fish + p_ind_manuf + p_const + 
-                           p_fin_insur + p_real_estate + p_other,
+period_model_w_kfold <- train(gdp ~ 1 + total_population_in_thous + total_exports_mill_usd + 
+    total_imports_mill_usd + p_employed + p_agr_for_fish + p_ind_inc_energy + 
+    p_ind_manuf + p_const + prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_inf_com + p_fin_insur + p_real_estate + p_prof_sci_techn_act_adm_supp + 
+    p_pub_adm_compul_ss_ed_hhealth + p_other + 
+    total_exports_mill_usd:total_population_in_thous + 
+    total_imports_mill_usd:total_population_in_thous + 
+    p_employed:total_population_in_thous + p_employed:total_imports_mill_usd + 
+    p_agr_for_fish:total_imports_mill_usd + 
+    p_ind_inc_energy:total_population_in_thous + 
+    p_ind_manuf:total_exports_mill_usd + p_ind_manuf:p_agr_for_fish + 
+    p_const:total_exports_mill_usd + p_const:p_employed + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_agr_for_fish + 
+    p_inf_com:total_population_in_thous + p_inf_com:total_exports_mill_usd + 
+    p_inf_com:p_agr_for_fish + p_inf_com:p_ind_manuf + p_inf_com:p_const + 
+    p_inf_com:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_fin_insur:total_population_in_thous + p_fin_insur:total_imports_mill_usd + 
+    p_fin_insur:p_employed + p_fin_insur:p_ind_manuf + 
+    p_fin_insur:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_real_estate:total_exports_mill_usd + 
+    p_real_estate:total_imports_mill_usd + p_real_estate:p_employed + 
+    p_real_estate:p_agr_for_fish + p_real_estate:p_inf_com + 
+    p_prof_sci_techn_act_adm_supp:total_population_in_thous + 
+    p_prof_sci_techn_act_adm_supp:total_exports_mill_usd + 
+    p_prof_sci_techn_act_adm_supp:p_employed + 
+    p_prof_sci_techn_act_adm_supp:p_agr_for_fish + 
+    p_prof_sci_techn_act_adm_supp:p_ind_manuf + 
+    p_prof_sci_techn_act_adm_supp:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_prof_sci_techn_act_adm_supp:p_inf_com +
+    p_prof_sci_techn_act_adm_supp:p_fin_insur + 
+    p_pub_adm_compul_ss_ed_hhealth:total_imports_mill_usd + 
+    p_pub_adm_compul_ss_ed_hhealth:p_employed + 
+    p_pub_adm_compul_ss_ed_hhealth:p_agr_for_fish + 
+    p_pub_adm_compul_ss_ed_hhealth:p_ind_inc_energy + 
+    p_pub_adm_compul_ss_ed_hhealth:p_const + 
+    p_pub_adm_compul_ss_ed_hhealth:p_inf_com + 
+    p_pub_adm_compul_ss_ed_hhealth:p_fin_insur + 
+    p_pub_adm_compul_ss_ed_hhealth:p_real_estate + 
+    p_pub_adm_compul_ss_ed_hhealth:p_prof_sci_techn_act_adm_supp + 
+    p_other:total_exports_mill_usd + p_other:p_ind_inc_energy + 
+    p_other:p_prof_sci_techn_act_adm_supp,
                data = full_data_tidy,
                trControl = cv_100fold,
                method = "lm")
@@ -486,10 +609,48 @@ cv_100fold <- trainControl(method = "cv", #cross validation
                           number = 100, # 10 folds
                           savePredictions = TRUE) # save all predictions
 
-model_w_kfold <- train(gdp ~ total_population_in_mill+total_exports_mill_usd+
-                   total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
-                   p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
-                   p_pub_adm_compul_ss_ed_hhealth,
+model_w_kfold <- train(gdp ~ 1 + total_population_in_thous + p_employed + p_agr_for_fish +                                                                 
+    p_ind_inc_energy + p_ind_manuf + p_const + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ + p_inf_com + 
+    p_fin_insur + p_real_estate + p_prof_sci_techn_act_adm_supp + 
+    p_pub_adm_compul_ss_ed_hhealth + p_other + 
+    p_employed:total_population_in_thous + 
+    p_ind_inc_energy:total_population_in_thous + 
+    p_ind_manuf:total_population_in_thous + p_ind_manuf:p_employed + 
+    p_const:p_agr_for_fish + p_const:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:total_population_in_thous +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_agr_for_fish +
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_ind_inc_energy + 
+    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_const + 
+    p_inf_com:p_employed + p_inf_com:p_ind_manuf + p_inf_com:p_const + 
+    p_inf_com:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_fin_insur:total_population_in_thous + p_fin_insur:p_agr_for_fish +     
+    p_fin_insur:p_const + p_fin_insur:p_inf_com + p_real_estate:p_employed + 
+    p_real_estate:p_agr_for_fish + p_real_estate:p_ind_manuf + 
+    p_real_estate:p_const + 
+    p_real_estate:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_real_estate:p_inf_com + p_real_estate:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:total_population_in_thous + 
+    p_prof_sci_techn_act_adm_supp:p_employed + 
+    p_prof_sci_techn_act_adm_supp:p_ind_inc_energy + 
+    p_prof_sci_techn_act_adm_supp:p_const + 
+    p_prof_sci_techn_act_adm_supp:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_prof_sci_techn_act_adm_supp:p_inf_com + 
+    p_prof_sci_techn_act_adm_supp:p_fin_insur + 
+    p_prof_sci_techn_act_adm_supp:p_real_estate + 
+    p_pub_adm_compul_ss_ed_hhealth:total_population_in_thous + 
+    p_pub_adm_compul_ss_ed_hhealth:p_employed + 
+    p_pub_adm_compul_ss_ed_hhealth:p_agr_for_fish +
+    p_pub_adm_compul_ss_ed_hhealth:p_ind_inc_energy + 
+    p_pub_adm_compul_ss_ed_hhealth:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_pub_adm_compul_ss_ed_hhealth:p_inf_com + 
+    p_pub_adm_compul_ss_ed_hhealth:p_fin_insur +
+    p_pub_adm_compul_ss_ed_hhealth:p_real_estate + 
+    p_other:total_population_in_thous +
+    p_other:p_agr_for_fish + p_other:p_ind_inc_energy + p_other:p_ind_manuf + 
+    p_other:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
+    p_other:p_inf_com + p_other:p_fin_insur + p_other:p_real_estate +
+    p_other:p_prof_sci_techn_act_adm_supp,
                data = full_data_tidy,
                trControl = cv_100fold,
                method = "lm")
