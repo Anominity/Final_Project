@@ -204,7 +204,8 @@ growth <- prop_data %>%
          growth_perc_2017q3 = growth_pc(x2017_q3, x2017_q2),
          growth_perc_2017q4 = growth_pc(x2017_q4, x2017_q3)) %>%
   select(country, starts_with("growth")) %>% 
-  pivot_longer(cols = starts_with("growth"), names_to = "period", values_to = "gdp_perc_growth", names_prefix = "growth_perc_") %>% 
+  pivot_longer(cols = starts_with("growth"), names_to = "period", 
+               values_to = "gdp_perc_growth", names_prefix = "growth_perc_") %>% 
   mutate(period = as.yearqtr(period, format = "%Yq%q"))
 
 prop_data_growth_pc <- prop_data %>% 
@@ -238,13 +239,37 @@ prop_data_growth_pc %>%
 ### working out countries with better average per quarter GDP growth than the UK
 ```{r}
 
+uk_mean_gdp_growth <- prop_data_growth_pc %>% 
+  group_by(country) %>% 
+  summarise(mean_gdp_growth = mean(gdp_perc_growth)) %>% 
+  filter(country == "United Kingdom") %>% 
+  select(mean_gdp_growth) %>% 
+  pull()
+
+uk_mean_gdp <- prop_data_growth_pc %>% 
+  group_by(country) %>% 
+  summarise(mean_gdp = mean(gdp)) %>% 
+  filter(country == "United Kingdom") %>% 
+  select(mean_gdp) %>% 
+  pull()
+
 ctry_higher_mean_growth <- prop_data_growth_pc %>% 
   group_by(country) %>% 
-  summarise(average_gdp_growth = mean(gdp_perc_growth)) %>% 
-  filter(average_gdp_growth >= 0.3406250) %>% 
+  summarise(mean_gdp_growth = mean(gdp_perc_growth)) %>% 
+  filter(mean_gdp_growth >= uk_mean_gdp_growth) %>% 
   select(country) %>% 
   pull() %>% 
   as.list()
+
+ctry_higher_mean_gdp <- prop_data_growth_pc %>% 
+  group_by(country) %>% 
+  summarise(mean_gdp = mean(gdp)) %>% 
+  filter(mean_gdp >= uk_mean_gdp) %>% 
+  select(country) %>% 
+  pull() %>% 
+  as.list()
+
+
 
 ```
 
@@ -452,7 +477,8 @@ gdp_country_test %>%
 ```{r}
 
 full_data_tidy <- prop_data_growth_pc %>% 
-  select(-c(country, period, is_uk)) %>% 
+  select(-c(country, period, is_uk, gdp_perc_growth, total_exports_mill_usd, 
+            total_imports_mill_usd)) %>% 
   drop_na()
 
 cv_100fold <- trainControl(method = "cv", #cross validation
@@ -559,7 +585,7 @@ glmulti_period_fit %>%
 ### Check AR2 and coeffs
 ```{r}
 
-train_period_model = lm(gdp ~ total_population_in_mill+total_exports_mill_usd+
+train_period_model = lm(gdp ~ total_population_in_thous+total_exports_mill_usd+
                    total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
                    p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
                    p_pub_adm_compul_ss_ed_hhealth,
@@ -574,7 +600,7 @@ train_period_model %>%
 gdp_period_test_tidy <- gdp_period_test %>% 
   select(-c(country, period, is_uk))
 
-test_period_model = lm(gdp ~ total_population_in_mill+total_exports_mill_usd+
+test_period_model = lm(gdp ~ total_population_in_thous+total_exports_mill_usd+
                    total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
                    p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
                    p_pub_adm_compul_ss_ed_hhealth,
@@ -606,52 +632,14 @@ full_data_tidy <- prop_data_growth_pc %>%
   drop_na()
 
 cv_100fold <- trainControl(method = "cv", #cross validation
-                          number = 100, # 10 folds
+                          number = 10, # 10 folds
                           savePredictions = TRUE) # save all predictions
 
-model_w_kfold <- train(gdp ~ 1 + total_population_in_thous + p_employed + p_agr_for_fish +                                                                 
-    p_ind_inc_energy + p_ind_manuf + p_const + 
-    prop_dist_trd_reprs_transp_accom_food_serv_activ + p_inf_com + 
-    p_fin_insur + p_real_estate + p_prof_sci_techn_act_adm_supp + 
-    p_pub_adm_compul_ss_ed_hhealth + p_other + 
-    p_employed:total_population_in_thous + 
-    p_ind_inc_energy:total_population_in_thous + 
-    p_ind_manuf:total_population_in_thous + p_ind_manuf:p_employed + 
-    p_const:p_agr_for_fish + p_const:p_ind_inc_energy + 
-    prop_dist_trd_reprs_transp_accom_food_serv_activ:total_population_in_thous +
-    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_agr_for_fish +
-    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_ind_inc_energy + 
-    prop_dist_trd_reprs_transp_accom_food_serv_activ:p_const + 
-    p_inf_com:p_employed + p_inf_com:p_ind_manuf + p_inf_com:p_const + 
-    p_inf_com:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_fin_insur:total_population_in_thous + p_fin_insur:p_agr_for_fish +     
-    p_fin_insur:p_const + p_fin_insur:p_inf_com + p_real_estate:p_employed + 
-    p_real_estate:p_agr_for_fish + p_real_estate:p_ind_manuf + 
-    p_real_estate:p_const + 
-    p_real_estate:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_real_estate:p_inf_com + p_real_estate:p_fin_insur + 
-    p_prof_sci_techn_act_adm_supp:total_population_in_thous + 
-    p_prof_sci_techn_act_adm_supp:p_employed + 
-    p_prof_sci_techn_act_adm_supp:p_ind_inc_energy + 
-    p_prof_sci_techn_act_adm_supp:p_const + 
-    p_prof_sci_techn_act_adm_supp:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_prof_sci_techn_act_adm_supp:p_inf_com + 
-    p_prof_sci_techn_act_adm_supp:p_fin_insur + 
-    p_prof_sci_techn_act_adm_supp:p_real_estate + 
-    p_pub_adm_compul_ss_ed_hhealth:total_population_in_thous + 
-    p_pub_adm_compul_ss_ed_hhealth:p_employed + 
-    p_pub_adm_compul_ss_ed_hhealth:p_agr_for_fish +
-    p_pub_adm_compul_ss_ed_hhealth:p_ind_inc_energy + 
-    p_pub_adm_compul_ss_ed_hhealth:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_pub_adm_compul_ss_ed_hhealth:p_inf_com + 
-    p_pub_adm_compul_ss_ed_hhealth:p_fin_insur +
-    p_pub_adm_compul_ss_ed_hhealth:p_real_estate + 
-    p_other:total_population_in_thous +
-    p_other:p_agr_for_fish + p_other:p_ind_inc_energy + p_other:p_ind_manuf + 
-    p_other:prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_other:p_inf_com + p_other:p_fin_insur + p_other:p_real_estate +
-    p_other:p_prof_sci_techn_act_adm_supp,
-               data = full_data_tidy,
+model_w_kfold <- train(gdp ~ total_population_in_thous+total_exports_mill_usd+
+                   total_imports_mill_usd+p_employed+p_agr_for_fish+p_inf_com+
+                   p_fin_insur+p_real_estate+p_prof_sci_techn_act_adm_supp+
+                   p_pub_adm_compul_ss_ed_hhealth,
+                   data = full_data_tidy,
                trControl = cv_100fold,
                method = "lm")
 
