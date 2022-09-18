@@ -202,29 +202,57 @@ all_annu_data_w_props <- all_annu_data %>%
          prop_m_at_ss = prop(male_secondary_education, population_total),
          prop_f_ter_edu = prop(female_tertiary_education, population_total),
          prop_m_ter_edu = prop(male_tertiary_education, population_total))
+
+uk_only <- all_annu_data %>% 
+  filter(is_uk == "UK")
 ```
 
 # Plots
-##
+
+## 
+```{r}
+uk_mean_annual_gdp <- all_annu_data %>% 
+  group_by(country, is_uk) %>% 
+  summarise(mean_gdp = mean(usd_gross_domestic_product_expenditure_approach), 
+            .groups = "drop") %>% 
+  filter(is_uk == "UK") %>% 
+  select(mean_gdp) %>% 
+  pull()
+
+all_annu_data %>% 
+  group_by(country, is_uk) %>% 
+  summarise(mean_gdp = mean(usd_gross_domestic_product_expenditure_approach), 
+            .groups = "drop") %>% 
+  filter(mean_gdp >= uk_mean_annual_gdp) %>% 
+  ggplot(aes(fct_reorder(country, mean_gdp), mean_gdp)) +
+  geom_col(aes(fill = is_uk)) + 
+  coord_flip()
+
+
+```
+
 ```{r}
 
 all_annu_data %>% 
   ggplot(aes(year, usd_gross_domestic_product_expenditure_approach)) +
-  geom_line(aes(group = country, colour = is_uk))
+  geom_line(aes(group = country), alpha = 0.3) +
+  geom_line(data = uk_only, aes(colour = country), colour = "blue")
 
+```
+
+```{r}
+uk_only <- all_annu_data %>% 
+  filter(is_uk == "UK")
+
+all_annu_data %>% 
+  ggplot(aes(year, pc_gross_domestic_product_output_approach)) +
+  geom_line(aes(group = country), alpha = 0.3) +
+  geom_line(data = uk_only, aes(colour = country), colour = "blue")
 ```
 
 ```{r}
 
 all_annu_data %>% 
-  ggplot(aes(year, pc_gross_domestic_product_output_approach)) +
-  geom_line(aes(group = country, colour = is_uk))
-
-```
-
-```{r}
-
-full_data %>% 
   group_by(country, is_uk) %>% 
   summarise(mean_final_consumption_expenditure_of_households = 
               mean(usd_final_consumption_expenditure_of_households)) %>% 
@@ -235,15 +263,16 @@ full_data %>%
   geom_col(aes(fill = is_uk)) +
   coord_flip()
 
-full_data %>% 
+all_annu_data %>% 
   ggplot(aes(year, usd_final_consumption_expenditure_of_households)) +
-  geom_line(aes(group = country, colour = is_uk))
+  geom_line(aes(group = country), alpha = 0.3) +
+  geom_line(data = uk_only, aes(colour = country), colour = "blue")
 
 ```
 
 ```{r}
 
-full_data %>% 
+all_annu_data %>% 
   group_by(country, is_uk) %>% 
   summarise(mean_usd_of_which_actual_individual_consumption = 
               mean(usd_of_which_actual_individual_consumption)) %>% 
@@ -254,34 +283,22 @@ full_data %>%
   geom_col(aes(fill = is_uk)) +
   coord_flip()
 
-full_data %>% 
+all_annu_data %>% 
   ggplot(aes(year, usd_of_which_actual_individual_consumption)) +
-  geom_line(aes(group = country, colour = is_uk))
+  geom_line(aes(group = country), alpha = 0.3) +
+  geom_line(data = uk_only, aes(colour = country), colour = "blue")
 
 ```
 
-```{r}
 
-full_data %>% 
-  group_by(country, is_uk) %>% 
-  summarise(mean_gdp = mean(usd_gross_domestic_product_expenditure_approach), 
-            .groups = "drop") %>% 
-  filter(mean_gdp >= 38325) %>% 
-  ggplot(aes(fct_reorder(country, mean_gdp), mean_gdp)) +
-  geom_col(aes(fill = is_uk)) + 
-  coord_flip()
-
-full_data %>% 
-  filter(country %in% ctry_higher_mean_gdp)
-```
 
 ```{r}
 
-full_data %>% 
+all_annu_data %>% 
   filter(!is.na(female_primary_education)) %>%
   select(-c(starts_with("usd"), starts_with("pc"), starts_with("mobile"))) %>%
-  ggplot(aes(year, population_total)) + 
-  geom_line(aes(group = country, colour = is_uk))
+  ggplot(aes(year, population_total/1000)) + 
+  geom_line(aes(group = country, colour = is_uk), show.legend = FALSE) 
  
 
 ```
