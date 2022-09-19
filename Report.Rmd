@@ -66,6 +66,8 @@ The files were all downloaded in .CSV file format.
 
 Briefly describe the quality of the data and whether you have any reasons to suggest the data is biased e.g. only data from a specific demographic even though a broader demographic would be of interest to the organisation.
 
+As the data is all broad demographical data, with very little 
+
 ## Ethics
 
 #### Ethical issues in data sourcing and extraction

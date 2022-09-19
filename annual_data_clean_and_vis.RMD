@@ -191,7 +191,7 @@ prop <- function(x, y, dp=2){
 ```
 ## proportion education
 ```{r}
-all_annu_data_w_props <- all_annu_data %>% 
+all_annu_data_w_edu_props <- all_annu_data %>% 
   select(-c(starts_with("usd"), starts_with("pc"), starts_with("mobile"),
             starts_with("female_from"), starts_with("male_from"), 
             starts_with("total_from"), fixed_bb_subs_p_100)) %>% 
@@ -211,14 +211,27 @@ uk_only <- all_annu_data %>%
 
 all_annu_data %>% 
   left_join(all_annu_data_w_props) %>% 
-  select(-c(starts_with("male"), starts_with("female"), starts_with("total")))
+  filter(!country == "Colombia") %>% 
+  select(year, starts_with("usd"), starts_with("pc")) %>% 
+   drop_na() 
+# %>% 
+  # ggpairs()
+  # 
   
 ```
 
 ## Checking correlations
-```{r}
-all_annu_data_w_props %>% 
+```{r, message=FALSE}
+all_annu_data_w_edu_props %>% 
+  select(-country) %>% 
+  ggpairs()
 ```
+
+```{r, message=FALSE}
+all_annu_data %>% 
+  skim()
+```
+
 
 # Plots
 
