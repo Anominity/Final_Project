@@ -190,7 +190,7 @@ prop <- function(x, y, dp=2){
 }
 ```
 ## proportion education
-```{r}
+```{r, message=FALSE}
 all_annu_data_w_edu_props <- all_annu_data %>% 
   select(-c(starts_with("usd"), starts_with("pc"), starts_with("mobile"),
             starts_with("female_from"), starts_with("male_from"), 
@@ -209,23 +209,80 @@ uk_only <- all_annu_data %>%
   filter(is_uk == "UK")
 
 
-all_annu_data %>% 
-  left_join(all_annu_data_w_props) %>% 
+all_useable <- all_annu_data %>% 
+  left_join(all_annu_data_w_edu_props) %>% 
   filter(!country == "Colombia") %>% 
-  select(year, starts_with("usd"), starts_with("pc")) %>% 
-   drop_na() 
-# %>% 
-  # ggpairs()
-  # 
-  
+  select(country, year, is_uk, starts_with("usd"), starts_with("pc")) %>% 
+  drop_na() 
+
+
 ```
 
 ## Checking correlations
 ```{r, message=FALSE}
-all_annu_data_w_edu_props %>% 
-  select(-country) %>% 
-  ggpairs()
+
+uk_mean_pc_export_of_goods <- all_useable %>% 
+  group_by(country) %>% 
+  summarise(mean_pc_export_of_goods_services = 
+              mean(pc_exports_of_goods_and_services)) %>% 
+  filter(country == "United Kingdom") %>% 
+  select(mean_pc_export_of_goods_services) %>% 
+  pull()
+
+ctry_higherthan_uk <-  all_useable %>%
+group_by(country) %>% 
+  summarise(mean_pc_export_of_goods_services = 
+              mean(pc_exports_of_goods_and_services)) %>% 
+  filter(mean_pc_export_of_goods_services >= uk_mean_pc_export_of_goods) %>% 
+  select(country) %>% 
+  pull() %>% 
+  as.list()
+
+
+all_useable %>%
+  filter(country %in% ctry_higherthan_uk) %>% 
+  select(3:6, 31:33, 36) %>% 
+   ggpairs()
+
+
 ```
+
+
+```{r}
+
+
+all_useable %>%
+group_by(country, is_uk) %>% 
+  summarise(mean_pc_export_of_goods_services = 
+              mean(pc_exports_of_goods_and_services)) %>% 
+  filter(mean_pc_export_of_goods_services >= uk_mean_pc_export_of_goods) %>% 
+  ggplot(aes(fct_reorder(country, mean_pc_export_of_goods_services), mean_pc_export_of_goods_services)) +
+  geom_col(aes(fill = is_uk), show.legend = FALSE) +
+  coord_flip() + 
+  scale_fill_manual(values = c("#3AA859", "#2095C0")) +
+  labs(x = "", y = "Mean Percentage of Export of Goods and Services", title = 
+         "Countries with a Higher proportion Export of Goods and Services")
+
+all_useable %>% 
+  filter(country %in% ctry_higherthan_uk) %>% 
+  ggplot(aes(year, pc_exports_of_goods_and_services)) +
+  geom_line(aes(group = country), alpha = 0.2) +
+  geom_line(data = all_useable %>% filter(country == "United Kingdom"), 
+            size = 2, colour = "red") +
+  xlim(2000, 2020)
+  
+```
+
+```{r}
+
+all_useable %>% 
+  ggplot(aes(year, pc_final_consumption_expenditure_of_households)) +
+  geom_line(aes(group = country), alpha = 0.2) +
+  geom_line(data = all_useable %>% filter(country == "United Kingdom"), 
+            size = 2, colour = "red") +
+  xlim(2000, 2020)
+```
+
 
 ```{r, message=FALSE}
 all_annu_data %>% 
@@ -252,7 +309,8 @@ all_annu_data %>%
   filter(mean_gdp >= uk_mean_annual_gdp) %>% 
   ggplot(aes(fct_reorder(country, mean_gdp), mean_gdp)) +
   geom_col(aes(fill = is_uk)) + 
-  coord_flip()
+  coord_flip() +
+  theme()
 
 
 ```
