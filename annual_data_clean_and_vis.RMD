@@ -8,7 +8,7 @@ source("librarys.R")
 
 ```
 # Data Read in
-```{r}
+```{r, message=FALSE}
 
 gdp_raw <- 
   read.csv(here::here("raw_data/Annual/GDP_three_approaches00-21.csv")) %>% 
@@ -201,10 +201,23 @@ all_annu_data_w_props <- all_annu_data %>%
          prop_f_at_ss = prop(female_secondary_education, population_total),
          prop_m_at_ss = prop(male_secondary_education, population_total),
          prop_f_ter_edu = prop(female_tertiary_education, population_total),
-         prop_m_ter_edu = prop(male_tertiary_education, population_total))
+         prop_m_ter_edu = prop(male_tertiary_education, population_total)) %>% 
+  select(-c(starts_with("male"), starts_with("female"), starts_with("total"), 
+            population_female, population_male, is_uk))
 
 uk_only <- all_annu_data %>% 
   filter(is_uk == "UK")
+
+
+all_annu_data %>% 
+  left_join(all_annu_data_w_props) %>% 
+  select(-c(starts_with("male"), starts_with("female"), starts_with("total")))
+  
+```
+
+## Checking correlations
+```{r}
+all_annu_data_w_props %>% 
 ```
 
 # Plots
@@ -236,7 +249,7 @@ all_annu_data %>%
 all_annu_data %>% 
   ggplot(aes(year, usd_gross_domestic_product_expenditure_approach)) +
   geom_line(aes(group = country), alpha = 0.3) +
-  geom_line(data = uk_only, aes(colour = country), colour = "blue")
+  geom_line(data = uk_only, aes(colour = country), size = 1.5, colour = "blue")
 
 ```
 
