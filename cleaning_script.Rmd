@@ -211,41 +211,6 @@ growth <- prop_data %>%
 prop_data_growth_pc <- prop_data %>% 
   left_join(growth)
 ```
-## Finding relevant correlations
-```{r, message=FALSE, warning=FALSE}
-
-prop_data_growth_pc %>% 
-  filter(country %in% ctry_higher_mean_growth) %>% 
-  select(3, 7, 9:11, 14, 15, 17) %>% 
-  ggpairs()
-
-```
-
-
-## Plots 
-### UK GDP vs other countries
-```{r}
-prop_data %>% 
-  ggplot(aes(x = period, y = gdp)) +
-  geom_line(aes(group = country), show.legend = FALSE, alpha = 0.3) +
-  geom_line(data = (prop_data %>% filter(country == "United Kingdom")), 
-            size = 2, colour = "red")
-
-```
-### GDP Growth Comparison
-```{r}
-
-prop_data_growth_pc %>% 
-  ggplot(aes(x = period, y = gdp_perc_growth)) +
-  geom_line(aes(group = country), colour = "grey50", show.legend = FALSE) +
-  geom_line(data = (prop_data_growth_pc %>% filter(country == "United Kingdom")), 
-            size = 1.5, colour = "#2095C0") +
-  ylim(NA, 7.5) +
-  xlim(2010.1, NA)
-
-
-```
-
 ### working out countries with better average per quarter GDP growth than the UK
 ```{r}
 
@@ -281,11 +246,82 @@ ctry_higher_mean_gdp <- prop_data_growth_pc %>%
 
 ```
 
+## Finding relevant correlations
+```{r, message=FALSE, warning=FALSE}
+
+prop_data_growth_pc %>% 
+  filter(country %in% ctry_higher_mean_gdp) %>% 
+  select(3, 7, 9:11, 14, 15, 17) %>% 
+  ggpairs()
+
+```
+
+
+## Plots 
+
+### UK vs Countries with higher GDP by percentage of industry
+
+```{r}
+
+prop_data_growth_pc %>% 
+  filter(country %in% ctry_higher_mean_gdp,
+         !country == "United Kingdom") %>% 
+    ggplot(aes(p_ind_inc_energy)) +
+    geom_boxplot(fill = "#3AA859") +
+  geom_boxplot(data = prop_data_growth_pc %>% 
+                 filter(country == "United Kingdom"),
+               aes(p_ind_inc_energy), fill = "#2095C0")
+    
+```
+
+
+### UK GDP vs other countries
+```{r}
+prop_data %>% 
+  ggplot(aes(x = period, y = gdp)) +
+  geom_line(aes(group = country), show.legend = FALSE, alpha = 0.3) +
+  geom_line(data = (prop_data %>% filter(country == "United Kingdom")), 
+            size = 2, colour = "red")
+
+```
+### GDP Growth Comparison
+```{r}
+
+prop_data_growth_pc %>% 
+  filter(country %in% ctry_higher_mean_growth) %>% 
+  ggplot(aes(x = period, y = gdp_perc_growth)) +
+  geom_line(aes(group = country), colour = "grey50", show.legend = FALSE) +
+  geom_line(data = (prop_data_growth_pc %>% filter(country == "United Kingdom")), 
+            size = 1.5, colour = "#2095C0") +
+  ylim(NA, 7.5) +
+  xlim(2010.1, NA)
+
+
+```
+
+### Plot showing average GDP over the time period
+
+```{r}
+prop_data_growth_pc %>% 
+#   filter(country %in% ctry_higher_mean_growth) %>% 
+  group_by(country, is_uk) %>% 
+  summarise(average_gdp = mean(gdp)) %>% 
+  # filter(average_gdp_growth >= 0.415625) %>% 
+  ggplot(aes(x = fct_reorder(country, average_gdp), 
+              average_gdp)) +
+  geom_col(aes(fill = is_uk), show.legend = FALSE) +
+  coord_flip() +
+  labs(y = "Mean GDP per quarter", x = "", 
+       title = "Mean GDP from 2010 to 2017") +
+  scale_fill_manual(values = c("#3AA859", "#2095C0"))
+```
+
+
 ### Plot showing average UK GDP growth vs other countries
 ```{r}
 
 prop_data_growth_pc %>% 
-   filter(country %in% ctry_higher_mean_growth) %>% 
+#   filter(country %in% ctry_higher_mean_growth) %>% 
   group_by(country, is_uk) %>% 
   summarise(average_gdp_growth = mean(gdp_perc_growth)) %>% 
   # filter(average_gdp_growth >= 0.415625) %>% 
@@ -293,8 +329,8 @@ prop_data_growth_pc %>%
               average_gdp_growth)) +
   geom_col(aes(fill = is_uk), show.legend = FALSE) +
   coord_flip() +
-  labs(y = "Average GDP Growth % per quarter", x = "", 
-       title = "Average GDP growth from 2010 to 2017") +
+  labs(y = "Mean GDP Growth % per quarter", x = "", 
+       title = "Mean GDP growth from 2010 to 2017") +
   scale_fill_manual(values = c("#3AA859", "#2095C0"))
 
 ```
@@ -303,7 +339,7 @@ prop_data_growth_pc %>%
 ## Country Split model
 ### Test train set using country
 ```{r}
-set.seed(523)
+set.seed(522)
 n_data1 <- prop_data_growth_pc %>% 
   distinct(country) %>% 
   nrow()
@@ -312,12 +348,12 @@ countrys <- prop_data_growth_pc %>%
   distinct(country) %>% 
   mutate(country_num = 1:n_data1)
 
-countrys_index <- tibble(sample(n_data1, size = n_data1 * 0.3)) %>% 
+countrys_index <- tibble(sample(n_data1, size = n_data1 * 0.25)) %>% 
   clean_names()
 
 country_name_index <- countrys_index %>%
   left_join(countrys, 
-            by = c("sample_n_data1_size_n_data1_0_3" = "country_num")) %>% 
+            by = c("sample_n_data1_size_n_data1_0_25" = "country_num")) %>% 
   select(country) %>% 
   pull()
   
@@ -360,10 +396,9 @@ print(glmulti_country_fit)
 ### Check AR2 and coeffs
 ```{r}
 train_country_model = lm(
-  gdp ~ total_population_in_thous + p_employed + p_agr_for_fish + 
-    p_ind_manuf + p_const + prop_dist_trd_reprs_transp_accom_food_serv_activ + 
-    p_inf_com + p_fin_insur + p_prof_sci_techn_act_adm_supp + 
-    p_pub_adm_compul_ss_ed_hhealth + p_other,                 
+  gdp ~ 1 + total_population_in_thous + p_employed + p_agr_for_fish +       
+p_ind_manuf + p_inf_com + p_fin_insur + p_prof_sci_techn_act_adm_supp + 
+p_pub_adm_compul_ss_ed_hhealth,                 
   data = gdp_country_train_tidy)
 
 train_country_model %>% 

@@ -256,7 +256,8 @@ group_by(country, is_uk) %>%
   summarise(mean_pc_export_of_goods_services = 
               mean(pc_exports_of_goods_and_services)) %>% 
   filter(mean_pc_export_of_goods_services >= uk_mean_pc_export_of_goods) %>% 
-  ggplot(aes(fct_reorder(country, mean_pc_export_of_goods_services), mean_pc_export_of_goods_services)) +
+  ggplot(aes(fct_reorder(country, mean_pc_export_of_goods_services), 
+             mean_pc_export_of_goods_services)) +
   geom_col(aes(fill = is_uk), show.legend = FALSE) +
   coord_flip() + 
   scale_fill_manual(values = c("#3AA859", "#2095C0")) +
@@ -310,8 +311,7 @@ all_annu_data %>%
   ggplot(aes(fct_reorder(country, mean_gdp), mean_gdp)) +
   geom_col(aes(fill = is_uk)) + 
   coord_flip() +
-  theme()
-
+  scale_fill_manual(values = c("#3AA859", "#2095C0"))
 
 ```
 
@@ -344,8 +344,11 @@ all_annu_data %>%
   ggplot(aes(fct_reorder(country, 
                          mean_final_consumption_expenditure_of_households),
              mean_final_consumption_expenditure_of_households)) +
-  geom_col(aes(fill = is_uk)) +
-  coord_flip()
+  geom_col(aes(fill = is_uk), show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = c("#3AA859", "#2095C0")) +
+  labs(y = "Mean Final Consumption Expenditure of Households", x = "", 
+       title = "Mean Final Consumption Expenditure of Households from 2010 to 2017")
 
 all_annu_data %>% 
   ggplot(aes(year, usd_final_consumption_expenditure_of_households)) +
