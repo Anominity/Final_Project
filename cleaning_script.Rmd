@@ -101,6 +101,8 @@ exp_cleaned <- imp_exp_cleaned %>%
 # 
 
   
+imp_cleaned %>% 
+  left_join(exp_cleaned)
 ```
 
 ## Joining datasets together, by country and period
@@ -114,7 +116,6 @@ gdp_pop_ind <- gdp_cleaned %>%
   left_join(imp_cleaned, by = c("country" = "reporter_country", 
                                 "period" = "time"))
 
-gdp_pop_ind
 ```
 ## Data Wrangling, creating proportions
 
@@ -258,6 +259,50 @@ prop_data_growth_pc %>%
 
 
 ## Plots 
+### Exports
+```{r}
+prop_data_growth_pc %>% 
+  select(country, period, gdp, total_exports_mill_usd) %>% 
+  group_by(country) %>% 
+  summarise(mean_exports = mean(total_exports_mill_usd)) %>% 
+  drop_na() %>% 
+  arrange(desc(mean_exports))
+
+
+prop_data_growth_pc %>% 
+  select(country, period, gdp, total_exports_mill_usd, 
+         total_imports_mill_usd) %>% 
+  ggplot(aes(period, total_exports_mill_usd)) +
+  geom_line(aes(group = country), alpha = 0.2) +
+  geom_line(data = prop_data_growth_pc %>% 
+              filter(country == "United Kingdom"), aes(colour = country), 
+            colour = "#2095C0", show.legend = TRUE) +
+  labs(x = "", y = "Total Exports in Millions of USD", 
+       title = "Total Exports in USD from 2010 - 2017") +
+  geom_label_repel(data = prop_data_growth_pc %>% 
+                     filter(country == "United Kingdom", 
+                            period == "2016 Q4"),
+             aes(label = country, size = NULL), direction = "y", nudge_y = 55000) 
+```
+### imports
+
+```{r}
+prop_data_growth_pc %>% 
+  select(country, period, gdp, total_exports_mill_usd, 
+         total_imports_mill_usd) %>% 
+  ggplot(aes(period, total_imports_mill_usd)) +
+  geom_line(aes(group = country), alpha = 0.2) +
+  geom_line(data = prop_data_growth_pc %>% 
+              filter(country == "United Kingdom"), aes(colour = country), 
+            colour = "#2095C0", show.legend = TRUE) +
+  labs(x = "", y = "Total Imports in Millions of USD", 
+       title = "Total Imports in USD from 2010 - 2017") +
+  geom_label_repel(data = prop_data_growth_pc %>% 
+                     filter(country == "United Kingdom", 
+                            period == "2016 Q4"),
+             aes(label = country, size = NULL), direction = "y", nudge_y = 55000)
+```
+
 
 ### UK vs Countries with higher GDP by percentage of industry
 
@@ -314,6 +359,8 @@ prop_data_growth_pc %>%
   labs(y = "Mean GDP per quarter", x = "", 
        title = "Mean GDP from 2010 to 2017") +
   scale_fill_manual(values = c("#3AA859", "#2095C0"))
+
+
 ```
 
 
@@ -332,6 +379,60 @@ prop_data_growth_pc %>%
   labs(y = "Mean GDP Growth % per quarter", x = "", 
        title = "Mean GDP growth from 2010 to 2017") +
   scale_fill_manual(values = c("#3AA859", "#2095C0"))
+
+```
+
+### GDP Hypothesis testing
+
+
+null hypothesis
+The mean GDP for the United Kingdom is the same as the mean GDP for the rest of the OECD countries
+$$
+\alpha = 0.05
+$$
+ $$
+ H_0: \mu_{GDP} = 41879
+ $$
+
+Alternate hypothesis
+The mean GDP for the UK is significantly different to the mean GDP for the rest of the OECD
+
+ $$
+ H_1: \mu_{GDP} \neq 41879
+ $$
+
+```{r}
+
+observed_stat <- prop_data_growth_pc %>% 
+  specify(gdp ~ is_uk) %>% 
+  calculate(stat = "diff in means", order = c("UK", "Other OECD"))
+
+null_distribution <- prop_data_growth_pc %>% 
+  specify(gdp ~ is_uk) %>%  
+  hypothesise(null = "independence") %>% 
+  generate(reps = 10000, type = "permute") %>% 
+  calculate(stat = "diff in means", order = c("UK", "Other OECD"))
+
+null_distribution %>% 
+  visualise(bins =  30) + 
+  shade_p_value(obs_stat = observed_stat$stat, direction = "both")
+
+p_value <- null_distribution %>% 
+  get_p_value(obs_stat = observed_stat$stat, direction = "both")
+
+
+```
+
+```{r}
+
+
+
+prop_data_growth_pc %>% 
+  select(country, gdp) %>% 
+  ggplot() +
+  aes(gdp) +
+  geom_histogram()
+
 
 ```
 

@@ -2800,6 +2800,7 @@ and exports?</li>
 any of these factors?</li>
 </ul></li>
 </ul>
+<p><br></p>
 </div>
 <div id="domain-knowledge-and-the-business-context" class="section level4">
 <h4>Domain knowledge and the business context</h4>
@@ -2812,17 +2813,13 @@ improvements in Productivity or GDP will have direct feedback into an
 improved market in Financial services.</p>
 <p>Using this analysis I aim to investigate and identify some key areas
 and show their correlations with GDP and Productivity.</p>
+<p><br></p>
 </div>
 </div>
 <div id="data" class="section level2">
 <h2>Data</h2>
-<div id="internal-and-external-data-sources" class="section level4">
-<h4>Internal and external data sources</h4>
-<p>Briefly describe your data sources and which were internal (provided
-by the organisation) and external (not sourced from the organisation’s
-data)</p>
-<p>In this analysis I have used a number of datasets:<br />
-GDP_three_approaches00-21.csv<br />
+<p>In this analysis I have used a number of datasets:</p>
+<p>GDP_three_approaches00-21.csv<br />
 broadband_and_phone09-21.csv<br />
 population_10-19.csv<br />
 education_enrolment_age.csv<br />
@@ -2830,41 +2827,33 @@ gdp_quarterly_10-17.csv<br />
 pop_employ_10-17.csv<br />
 employment_by_industry_10-17.csv<br />
 imp_exports_value.csv</p>
-<p>These documents were obtained from the OECD statistics databases
-at:</p>
+<p>These documents were obtained externally from the OECD statistics
+databases at:</p>
 <p><a href="https://stats.oecd.org/#" class="uri">https://stats.oecd.org/#</a></p>
-</div>
 <div id="types-of-data" class="section level4">
 <h4>Types of data</h4>
-<p>What kind of data did you work with? E.g. categorical and numerical
-data and their sub-types.</p>
 <p>The documents are arranged in Categorical, Numerical and Time
 Series.</p>
 </div>
 <div id="data-formats" class="section level4">
 <h4>Data formats</h4>
-<p>What format did your data come in? E.g. all downloaded flat files
-(CSV) or any data from APIs, scraping etc.</p>
 <p>The files were all downloaded in .CSV file format.</p>
 </div>
 <div id="data-quality-and-bias" class="section level4">
 <h4>Data quality and bias</h4>
-<p>Briefly describe the quality of the data and whether you have any
-reasons to suggest the data is biased e.g. only data from a specific
-demographic even though a broader demographic would be of interest to
-the organisation.</p>
+<p>Different concepts and basic statistical sources are used across
+countries, which can hinder international comparability. This needs to
+be taken into account when reviewing the findings of this analysis.</p>
 </div>
 </div>
 <div id="ethics" class="section level2">
 <h2>Ethics</h2>
-<div id="ethical-issues-in-data-sourcing-and-extraction" class="section level4">
-<h4>Ethical issues in data sourcing and extraction</h4>
-<p>Do you have any ethical concerns regarding the sourcing and
-extraction of your data?</p>
-</div>
+<p>As the data is all broad demographical data, there is no personally
+identifiable information.</p>
 <div id="ethical-implications-of-business-requirements" class="section level4">
 <h4>Ethical implications of business requirements</h4>
-<p>Are there any ethical implications of the business requirements?</p>
+<p>I do not feel there are any ethical implications of the business
+requirements as it is a very broad analysis. <br></p>
 </div>
 </div>
 <div id="analysis" class="section level2">
@@ -2872,25 +2861,86 @@ extraction of your data?</p>
 <div id="stages-in-the-data-analysis-process" class="section level4">
 <h4>Stages in the data analysis process</h4>
 <p>What were the main stages in your data analysis process?</p>
+<p>The steps towards my analysis were as follows:</p>
+<ul>
+<li><p>Read in data.</p></li>
+<li><p>Clean Datasets</p>
+<ul>
+<li>Remove erroneous variables<br />
+</li>
+<li>Pivot datasets accordingly<br />
+</li>
+<li>Filter out of scope entries<br />
+</li>
+<li>Rename fields</li>
+</ul></li>
+<li><p>Join Datasets together</p></li>
+<li><p>Data Wrangling</p>
+<ul>
+<li>Wrangle data to be more consistent (ie, Population in industry
+figures, to proportions of population)<br />
+</li>
+<li>Group fields together (ie, Age to Age groups etc.)</li>
+</ul></li>
+<li><p>Visualisation of Data</p>
+<ul>
+<li>Extract key points in data via plots</li>
+</ul></li>
+<li><p>Machine Learning</p>
+<ul>
+<li>Test / Train split<br />
+</li>
+<li>Establish a workable model on train<br />
+</li>
+<li>Validate model on Test<br />
+</li>
+<li>K-Fold Validation</li>
+</ul></li>
+<li><p>Concerns &amp; Conclusions</p></li>
+</ul>
+<p><br></p>
 </div>
 <div id="tools-for-data-analysis" class="section level4">
 <h4>Tools for data analysis</h4>
-<p>What were the main tools you used for your analysis?</p>
+<p>For my analysis I used the following:</p>
+<ul>
+<li>RStudio 2022.07.1 Build 554<br />
+</li>
+<li>R version 4.2.0</li>
+</ul>
+<p>R packages:</p>
+<ul>
+<li>tidyverse<br />
+</li>
+<li>janitor<br />
+</li>
+<li>zoo<br />
+</li>
+<li>ggpairs<br />
+</li>
+<li>ggfortify<br />
+</li>
+<li>ggrepel<br />
+</li>
+<li>infer<br />
+</li>
+<li>glmulti<br />
+</li>
+<li>modelr<br />
+</li>
+<li>caret</li>
+</ul>
+<p><br></p>
 </div>
-<div id="descriptive-diagnostic-predictive-and-prescriptive-analysis" class="section level4">
-<h4>Descriptive, diagnostic, predictive and prescriptive analysis</h4>
-<p>Please report under which of the below categories your analysis falls
-<strong>and why</strong> (can be more than one)</p>
-<div class="emphasis">
-<p><strong>Descriptive Analytics</strong> tells you what happened in the
-past.</p>
-<p><strong>Diagnostic Analytics</strong> helps you understand why
-something happened in the past.</p>
-<p><strong>Predictive Analytics</strong> predicts what is most likely to
-happen in the future.</p>
-<p><strong>Prescriptive Analytics</strong> recommends actions you can
-take to affect those outcomes.</p>
-</div>
+<div id="types-of-analysis" class="section level4">
+<h4>Types of Analysis</h4>
+<p>My Analysis falls under Descriptive, Prescriptive and a little
+Predictive Analysis.</p>
+<p>Descriptive was in the attempting to ascertain what key factors were
+influencing GDP in the past.</p>
+<p>Prescriptive in suggesting ways in which GDP growth could be
+potentially improved.</p>
+<p>Predictive with a few notes on the challenges of predicting GDP.</p>
 </div>
 </div>
 

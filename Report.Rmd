@@ -20,6 +20,7 @@ output:
   - What factors might be important in predicting a country’s GDP?
   - Can you predict GDP estimates/growth for the upcoming year(s) from any of these factors?
 
+<br>
 
 #### Domain knowledge and the business context
 
@@ -29,11 +30,9 @@ This is important to Deloitte as a financial services company as any improvement
 
 Using this analysis I aim to investigate and identify some key areas and show their correlations with GDP and Productivity.
 
+<br>
+
 ## Data
-
-#### Internal and external data sources
-
-Briefly describe your data sources and which were internal (provided by the organisation) and external (not sourced from the organisation's data)
 
 In this analysis I have used a number of datasets:  
   
@@ -52,31 +51,25 @@ https://stats.oecd.org/#
 
 #### Types of data
 
-What kind of data did you work with? E.g. categorical and numerical data and their sub-types.
-
 The documents are arranged in Categorical, Numerical and Time Series.
 
 #### Data formats
-
-What format did your data come in? E.g. all downloaded flat files (CSV) or any data from APIs, scraping etc.
 
 The files were all downloaded in .CSV file format.
 
 #### Data quality and bias
 
-Briefly describe the quality of the data and whether you have any reasons to suggest the data is biased e.g. only data from a specific demographic even though a broader demographic would be of interest to the organisation.
-
-As the data is all broad demographical data, with very little 
+Different concepts and basic statistical sources are used across countries, which can hinder international comparability. This needs to be taken into account when reviewing the findings of this analysis.
 
 ## Ethics
 
-#### Ethical issues in data sourcing and extraction
 
-Do you have any ethical concerns regarding the sourcing and extraction of your data? 
+As the data is all broad demographical data, there is no personally identifiable information.
 
 #### Ethical implications of business requirements
 
-Are there any ethical implications of the business requirements?
+I do not feel there are any ethical implications of the business requirements as it is a very broad analysis.
+<br>
 
 ## Analysis
 
@@ -86,53 +79,63 @@ What were the main stages in your data analysis process?
 
 The steps towards my analysis were as follows:  
 
-Read in data.
-- Clean Datasets 
-  - Remove erroneous variables
-  - Pivot datasets accordingly
-  - Filter out of scope entries
-  - Rename fields
-  
-- Join Datasets together
+- Read in data.  
 
-- Data Wrangling
-  - Wrangle data to be more consistent (ie, Population in industry figures, to proportions of population)
-  - Group fields together (ie, Age to Age groups etc.)
-  
-- Visualisation of Data
-  - Extract key points in data via plots
-  
-- Machine Learning 
-  - Test / Train split
-  - Establish a workable model on train
-  - Validate model on Test
-  - K-Fold Validation
+- Clean Datasets  
+  - Remove erroneous variables  
+  - Pivot datasets accordingly  
+  - Filter out of scope entries  
+  - Rename fields  
 
+- Join Datasets together  
+
+- Data Wrangling  
+  - Wrangle data to be more consistent (ie, Population in industry figures, to proportions of population)  
+  - Group fields together (ie, Age to Age groups etc.)   
+
+- Visualisation of Data  
+  - Extract key points in data via plots  
+
+- Machine Learning  
+  - Test / Train split  
+  - Establish a workable model on train  
+  - Validate model on Test   
+  - K-Fold Validation  
+
+- Concerns & Conclusions  
+
+<br>
 
 #### Tools for data analysis
 
-What were the main tools you used for your analysis?
+For my analysis I used the following: 
 
-#### Descriptive, diagnostic, predictive and prescriptive analysis
+- RStudio 2022.07.1 Build 554  
+- R version 4.2.0  
+  
+R packages:   
 
-Please report under which of the below categories your analysis falls **and why** (can be more than one) 
+- tidyverse  
+- janitor  
+- zoo  
+- ggpairs   
+- ggfortify  
+- ggrepel  
+- infer  
+- glmulti  
+- modelr  
+- caret  
+  
+<br>
 
-My Analysis falls under Descriptive, Predictive and Prescriptive Analysis.
+#### Types of Analysis
+
+
+My Analysis falls under Descriptive, Prescriptive and a little Predictive Analysis.
 
 Descriptive was in the attempting to ascertain what key factors were influencing GDP in the past.
 
-Predictive in attempting to predict future GDP in the UK.
+Prescriptive in suggesting ways in which GDP growth could be potentially improved.
 
-and Prescriptive in suggesting ways in which GDP growth could be potentially improved.
-
-::: {.emphasis}
-**Descriptive Analytics** tells you what happened in the past.
-
-**Diagnostic Analytics** helps you understand why something happened in the past.
-
-**Predictive Analytics** predicts what is most likely to happen in the future.
-
-**Prescriptive Analytics** recommends actions you can take to affect those outcomes.
-:::
-
+Predictive with a few notes on the challenges of predicting GDP.
 
