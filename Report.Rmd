@@ -36,18 +36,31 @@ Using this analysis I aim to investigate and identify some key areas and show th
 
 In this analysis I have used a number of datasets:  
   
-GDP_three_approaches00-21.csv  
-broadband_and_phone09-21.csv  
-population_10-19.csv  
-education_enrolment_age.csv  
+GDP_three_approaches00-21.csv   
+ - 44960 observations x 17 variables  
+
+population_10-19.csv   
+ - 62586 observations x 11 variables  
+
+education_enrolment_age.csv    
+ - 105222 observations x 15 variables  
+
 gdp_quarterly_10-17.csv  
+ - 2368 observations x 19 variables  
+
 pop_employ_10-17.csv  
-employment_by_industry_10-17.csv  
-imp_exports_value.csv  
+ - 4442 observations x 19 variables  
+
+employment_by_industry_10-17.csv   
+ - 36248 observations x 19 variables  
+
+imp_exports_value.csv   
+ - 84924 observations x 19 variables  
 
 These documents were obtained externally from the OECD statistics databases at:
 
 https://stats.oecd.org/#
+
 
 #### Types of data
 
